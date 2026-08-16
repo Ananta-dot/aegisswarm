@@ -1,0 +1,88 @@
+{
+  "best": {
+    "epoch": 1,
+    "device": "mps",
+    "best_genome": [
+      2,
+      12,
+      15,
+      3,
+      8,
+      7,
+      3,
+      12
+    ],
+    "fitness": 168.6752960685891,
+    "loss": 31.32470393141091,
+    "asset_survival_rate": 1.0,
+    "containment_rate": 0.46312399355877615,
+    "cumulative_damage": 1.2317010780671718,
+    "defenders_consumed": 33.0,
+    "mean_response_delay": 24.091208791208793
+  },
+  "history": [
+    {
+      "epoch": 0,
+      "device": "mps",
+      "best_genome": [
+        11,
+        6,
+        0,
+        2,
+        9,
+        10,
+        10,
+        12
+      ],
+      "fitness": 157.50988345113288,
+      "loss": 42.490116548867114,
+      "asset_survival_rate": 0.875,
+      "containment_rate": 0.5369061996779388,
+      "cumulative_damage": 1.7973042285838574,
+      "defenders_consumed": 31.0,
+      "mean_response_delay": 28.489037004662002
+    },
+    {
+      "epoch": 1,
+      "device": "mps",
+      "best_genome": [
+        2,
+        12,
+        15,
+        3,
+        8,
+        7,
+        3,
+        12
+      ],
+      "fitness": 168.6752960685891,
+      "loss": 31.32470393141091,
+      "asset_survival_rate": 1.0,
+      "containment_rate": 0.46312399355877615,
+      "cumulative_damage": 1.2317010780671718,
+      "defenders_consumed": 33.0,
+      "mean_response_delay": 24.091208791208793
+    },
+    {
+      "epoch": 2,
+      "device": "mps",
+      "best_genome": [
+        2,
+        12,
+        15,
+        3,
+        8,
+        7,
+        3,
+        12
+      ],
+      "fitness": 168.6752960685891,
+      "loss": 31.32470393141091,
+      "asset_survival_rate": 1.0,
+      "containment_rate": 0.46312399355877615,
+      "cumulative_damage": 1.2317010780671718,
+      "defenders_consumed": 33.0,
+      "mean_response_delay": 24.091208791208793
+    }
+  ]
+}

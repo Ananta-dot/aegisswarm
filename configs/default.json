@@ -1,0 +1,11 @@
+{
+  "world_size": 100.0,
+  "max_steps": 150,
+  "n_threats": 30,
+  "n_defenders": 8,
+  "n_assets": 2,
+  "n_sensors": 3,
+  "decoy_fraction": 0.20,
+  "fast_fraction": 0.25,
+  "sensor_quality": 1.0
+}
