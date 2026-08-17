@@ -20,19 +20,20 @@ PLANNING_DEV_SEEDS = tuple(range(13000, 13400))
 PLANNING_CONFIRM_SEEDS = tuple(range(14000, 14400))
 PLANNING_V2_DEV_SEEDS = tuple(range(15000, 15400))
 PLANNING_V2_CONFIRM_SEEDS = tuple(range(16000, 16400))
-
-# Simulator-v2 evidence-hardening development is fully consumed. Its reserved
-# evidence block remains untouched and belongs to that completed protocol.
 EVIDENCE_DEV_SEEDS = tuple(range(17000, 17400))
 EVIDENCE_CONFIRM_SEEDS = tuple(range(18000, 18400))
-
-# Reliability-aware executor development. This architecture was chosen after
-# inspecting EVIDENCE_DEV_SEEDS, so it receives a fresh development block.
 RELIABILITY_DEV_SEEDS = tuple(range(19000, 19400))
-
-# Reserved confirmation for a future frozen reliability-aware executor. Do not
-# inspect during architecture development or parameter changes.
 RELIABILITY_CONFIRM_SEEDS = tuple(range(20000, 20400))
+
+# Stochastic-robust training uses fresh structural worlds distinct from all prior
+# development/evidence blocks. These seeds are training data, not holdout evidence.
+ROBUST_TRAIN_WORLD_SEEDS = tuple(range(21000, 21032))
+
+# Fresh development evaluation for the robust-training architecture.
+ROBUST_DEV_SEEDS = tuple(range(22000, 22400))
+
+# Reserved robust-training confirmation. Do not inspect during development.
+ROBUST_CONFIRM_SEEDS = tuple(range(23000, 23400))
 
 SPLITS = {
     "train": TRAIN_SEEDS,
