@@ -6,8 +6,17 @@ VALIDATION_SEEDS = tuple(range(1000, 1100))
 DEV_TEST_SEEDS = tuple(range(2000, 2100))
 TEST_SEEDS = DEV_TEST_SEEDS  # backward-compatible name used by existing CLIs
 
-# Frozen formal holdout. Do not use these seeds for tuning or architecture changes.
+# Frozen V1 formal holdout. This block has now been consumed by the V1 proof and
+# must never be reused as unseen evidence for algorithm changes.
 FINAL_HOLDOUT_SEEDS = tuple(range(2100, 2500))
+
+# Axplorer V2 architecture-development block. It is intentionally separate from
+# every V1 evaluation block. Results here may guide V2 development.
+V2_DEV_SEEDS = tuple(range(3000, 3400))
+
+# Reserved V2 confirmation block. Do not inspect or evaluate these seeds until
+# the V2 architecture and hyperparameters have been frozen after development.
+V2_CONFIRM_SEEDS = tuple(range(6000, 6400))
 
 SPLITS = {
     "train": TRAIN_SEEDS,
