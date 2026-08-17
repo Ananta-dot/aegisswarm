@@ -1,7 +1,9 @@
 import numpy as np
 
 from aegisswarm.models import ThreatType
+from aegisswarm.rule_program import PROGRAM_LENGTH
 from aegisswarm.scenarios import ScenarioGenerator
+from aegisswarm.simulator_v2 import SimulatorV2
 from aegisswarm.splits import (
     EVIDENCE_DEV_SEEDS,
     RELIABILITY_DEV_SEEDS,
@@ -14,6 +16,7 @@ from aegisswarm.splits import (
 )
 from aegisswarm.strategy_selector import (
     FEATURE_NAMES,
+    ObservableStrategySelectorPolicy,
     RidgeRewardSelectorModel,
     feature_for_seed,
     observable_features,
@@ -76,6 +79,25 @@ def test_ridge_reward_selector_can_learn_contextual_preference():
     model = RidgeRewardSelectorModel.fit(x, rewards, alpha=0.1)
     choices = model.choose(np.asarray([[-3.0], [3.0]], dtype=float))
     assert choices.tolist() == [0, 1]
+
+
+def test_selector_policy_commits_to_predicted_frozen_program():
+    n_features = len(FEATURE_NAMES)
+    model = RidgeRewardSelectorModel(
+        feature_mean=np.zeros(n_features, dtype=float),
+        feature_scale=np.ones(n_features, dtype=float),
+        reward_mean=np.asarray([10.0, 0.0], dtype=float),
+        coefficients=np.zeros((n_features, 2), dtype=float),
+        alpha=1.0,
+    )
+    programs = [
+        np.zeros(PROGRAM_LENGTH, dtype=np.int16),
+        np.ones(PROGRAM_LENGTH, dtype=np.int16),
+    ]
+    policy = ObservableStrategySelectorPolicy(programs, model)
+    scenario = ScenarioGenerator().generate(seed=23)
+    SimulatorV2.evaluate_policy(scenario, policy)
+    assert policy.selected_index == 0
 
 
 def test_selector_seed_blocks_are_fresh_and_disjoint():
