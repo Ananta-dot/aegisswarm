@@ -25,16 +25,15 @@ from .scenarios import ScenarioGenerator
 from .scoring import EvalConfig
 from .simulator import Simulator
 from .splits import (
-    NATIVE_OBJECTIVE_CONFIRM_SEEDS,
-    NATIVE_OBJECTIVE_DEV_SEEDS,
+    NATIVE_OBJECTIVE_V2_CONFIRM_SEEDS,
+    NATIVE_OBJECTIVE_V2_DEV_SEEDS,
     TRAIN_SEEDS,
 )
 
 
-# V1 quick exposed a malformed zero-centred native utility that systematically
-# under-assigned. V2 preserves the clean representation ablation but uses a
-# state-reactive optimizer-native objective with the same structural base utility
-# as the rule-guided comparator.
+# V1 quick and full development exposed a malformed zero-centred native utility
+# that systematically under-assigned. V2 is a new representation and therefore
+# gets fresh development/confirmation blocks.
 PROTOCOL_ID = "aegisswarm-optimizer-native-objective-v2"
 SEARCH_SEEDS = (44001, 44002, 44003, 44004, 44005)
 TRAIN_SCENARIOS = 16
@@ -47,7 +46,7 @@ QUICK_TRAIN_SCENARIOS = 4
 QUICK_BUDGET = 128
 QUICK_POPULATION = 16
 QUICK_LOCAL_ROUNDS = 1
-QUICK_EVAL_SEEDS = tuple(NATIVE_OBJECTIVE_DEV_SEEDS[:20])
+QUICK_EVAL_SEEDS = tuple(NATIVE_OBJECTIVE_V2_DEV_SEEDS[:20])
 
 
 def _save_json(path: Path, data):
@@ -171,9 +170,10 @@ def _write_report(path, mode, seeds, fixed, rule, native, comparison):
         "local/evolutionary search family, and Hungarian execution fixed while changing",
         "the strategic representation searched by the optimizer-aware learner.",
         "",
-        "V2 was created after the V1 quick integration run exposed a malformed",
-        "zero-centred native utility. V2 shares the rule-guided policy's structural",
-        "base utility and searches smooth state-reactive modifiers.",
+        "V2 was created after the malformed V1 representation completed development.",
+        "Because that full V1 result informed V2 design, V2 uses a fresh development block.",
+        "V2 shares the rule-guided policy's structural base utility and searches smooth",
+        "state-reactive strategic modifiers.",
         "",
         "## Survival",
         "",
@@ -192,7 +192,7 @@ def _write_report(path, mode, seeds, fixed, rule, native, comparison):
     ]
     if mode == "development":
         lines += [
-            "Development evidence only. Do not run the reserved confirmation block until",
+            "Development evidence only. Do not run the reserved V2 confirmation block until",
             "the architecture and hyperparameters are explicitly frozen.",
         ]
     elif mode == "quick_development":
@@ -302,7 +302,7 @@ def run_native_objective_development(
         budget = ORACLE_BUDGET
         population = POPULATION
         local_rounds = LOCAL_REFINEMENT_ROUNDS
-        eval_seeds = NATIVE_OBJECTIVE_DEV_SEEDS
+        eval_seeds = NATIVE_OBJECTIVE_V2_DEV_SEEDS
 
     protocol = {
         "protocol_id": PROTOCOL_ID + ("-quick" if quick else "-development"),
@@ -321,8 +321,8 @@ def run_native_objective_development(
             "60-token state-reactive rule objective",
             "14-parameter smooth optimizer-native objective V2",
         ],
-        "v1_quick_diagnosis": (
-            "V1 zero-centred utility under-assigned and was invalidated before full development"
+        "v1_development_diagnosis": (
+            "V1 zero-centred utility under-assigned; full V1 development on 9000-9399 was inspected and invalidated"
         ),
     }
     _save_json(out_dir / "protocol.json", protocol)
@@ -418,7 +418,7 @@ def run_native_objective_confirmation(
     return _evaluate(
         out_dir,
         "confirmation",
-        NATIVE_OBJECTIVE_CONFIRM_SEEDS,
+        NATIVE_OBJECTIVE_V2_CONFIRM_SEEDS,
         rule_runs,
         native_runs,
         workers,
