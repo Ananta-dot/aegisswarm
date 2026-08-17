@@ -39,12 +39,19 @@ STOCHASTIC_ABLATION_TRAIN_WORLD_SEEDS = tuple(range(24000, 24032))
 STOCHASTIC_ABLATION_DEV_SEEDS = tuple(range(25000, 25400))
 STOCHASTIC_ABLATION_CONFIRM_SEEDS = tuple(range(26000, 26400))
 
-# Observable strategy selector. These are fresh because the selector hypothesis
-# was motivated by inspected best-of-five oracle evidence and subsequent failed
-# stochastic-training experiments.
+# Observable strategy selector. Full development consumed 27000-27399 and
+# 28000-28399. The selector underperformed the training-selected fixed program;
+# confirmation remains untouched and must not be repurposed.
 SELECTOR_TRAIN_SEEDS = tuple(range(27000, 27400))
 SELECTOR_DEV_SEEDS = tuple(range(28000, 28400))
 SELECTOR_CONFIRM_SEEDS = tuple(range(29000, 29400))
+
+# Oracle-decomposition diagnostic. These structural-world seeds are fresh because
+# the diagnostic was motivated after inspecting the failed selector development
+# result and recognizing that the raw hindsight oracle can benefit from
+# policy-specific stochastic interaction draws. This protocol changes no policy.
+ORACLE_DECOMP_DEV_SEEDS = tuple(range(30000, 30400))
+ORACLE_DECOMP_REPLICATION_SEEDS = tuple(range(31000, 31400))
 
 SPLITS = {
     "train": TRAIN_SEEDS,
