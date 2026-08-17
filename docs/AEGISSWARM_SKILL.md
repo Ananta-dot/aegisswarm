@@ -3,8 +3,8 @@ name: aegisswarm-project-context
 description: Canonical handoff for understanding, modifying, benchmarking, and advancing the AegisSwarm counter-swarm coordination research platform without invalidating experimental evidence.
 last_updated: 2026-08-17
 status: architecture-unfrozen
-active_branch: agent/hybrid-objective-learning
-active_protocol: aegisswarm-hybrid-objective-v1
+active_branch: agent/optimizer-native-objective
+active_protocol: aegisswarm-optimizer-native-objective-v2
 primary_external_deadline: 2026-09-30T23:59:00+05:30
 ---
 
@@ -22,9 +22,11 @@ The correct mindset is:
 
 The project is currently in a foundation/proof phase. The priority is to produce defensible technical evidence before making strong customer, investor, deployment, or superiority claims.
 
-The immediate active hypothesis is:
+The current active hypothesis is:
 
-> **Can AegisSwarm learn a better strategic objective for a constrained optimizer, and does a learned generative proposer add value beyond equally budgeted conventional search when both use the same optimizer?**
+> **Is the repeated ~80–81% development/formal plateau caused by the strategic representation supplied to the optimizer, or by the myopic one-step planning horizon?**
+
+The active representation experiment compares the existing 60-token state-reactive rule objective with a smooth 14-parameter optimizer-native objective under the same local/evolutionary search budget and Hungarian executor.
 
 Do not run a reserved confirmation block merely because a development run completes. First interpret the development evidence, decide whether architecture and hyperparameters are frozen, record that decision, and only then spend the confirmation set.
 
@@ -38,15 +40,6 @@ The system studies how an AI decision layer can coordinate limited sensing and d
 
 The system is not intended to design interceptor hardware or weapon mechanisms. The research contribution is the **coordination and decision layer**.
 
-At a conceptual level, the eventual system should answer questions such as:
-
-- what threats matter most right now;
-- which resources should remain in reserve;
-- what objective the allocation optimizer should prioritize;
-- how assignments should change as the state evolves;
-- how to trade containment, asset survival, resource use, and response delay;
-- how to remain robust under uncertain sensing, decoys, fast threats, resource scarcity, and changing swarm composition.
-
 Human supervision/manual override remains part of the intended operational concept.
 
 ---
@@ -55,26 +48,9 @@ Human supervision/manual override remains part of the intended operational conce
 
 Keep implementation **abstract, synthetic, defensive, and platform-independent**.
 
-Allowed project scope:
+Allowed scope includes abstract threat classes, synthetic/dimensionless kinematics, probabilistic sensing, abstract resource capacities/ranges, assignment/scheduling/prioritization/reserve logic, simulation, optimization, search, RL, uncertainty, stress testing, and human-in-the-loop decision support.
 
-- abstract threat classes;
-- synthetic/dimensionless kinematics;
-- probabilistic sensing;
-- abstract resource capacities and ranges;
-- assignment, scheduling, prioritization, reserve logic;
-- simulation, optimization, search, RL, uncertainty, stress testing;
-- decision-support and human-in-the-loop architecture.
-
-Do not extend the repository into:
-
-- weapon construction;
-- payload/warhead design;
-- real-world guidance-to-impact engineering;
-- platform-specific terminal targeting logic;
-- actionable hard-kill engineering details;
-- instructions for causing physical harm.
-
-If a future task requires higher-fidelity real-world integration, keep the research at the level of interfaces, abstract constraints, data schemas, and decision-support evaluation unless the project scope is explicitly and safely redefined.
+Do not extend the repository into weapon construction, payload/warhead design, real-world guidance-to-impact engineering, platform-specific terminal targeting logic, actionable hard-kill engineering details, or instructions for causing physical harm.
 
 ---
 
@@ -123,94 +99,37 @@ The key conceptual split is:
 
 > **Learning/search determines WHAT should be optimized. Optimization determines HOW to allocate resources subject to constraints.**
 
-Local search may remain valuable for offline improvement and proposal repair. RL may later be useful for adaptation to sequential non-stationarity. Explicit rules remain useful for safety, fallback behavior, and interpretable constraints.
-
-Therefore, do not frame the ultimate product objective as "beat optimization" or "beat RL." Those comparisons are useful only as ablations.
+Local/evolutionary search is currently the default offline search engine because Axplorer has not demonstrated a robust incremental benefit under the completed protocols. Axplorer remains an optional proposer/ablation and may become useful again if a future representation becomes sufficiently high-dimensional/structured.
 
 ---
 
 # 4. What success eventually means
 
-There are three progressively stronger success levels.
-
 ## Level A — simulator competence
 
 AegisSwarm materially improves protected-asset survival, containment, leakage/penetration, damage, and resource efficiency relative to simple heuristics in the synthetic environment.
 
-This is already substantially supported.
-
 ## Level B — architectural contribution
 
-A full hybrid architecture outperforms reduced versions of itself under controlled ablations, for example:
-
-```text
-fixed objective + optimizer
-searched objective + optimizer
-learned objective + optimizer
-learned objective + local refinement + optimizer
-full system with adaptation
-```
-
-This is the current research target.
+A full hybrid architecture outperforms reduced variants under controlled ablations.
 
 ## Level C — defensible external evidence
 
-Before deployment/customer/investor superiority claims, the system should additionally have:
-
-- multiple untouched scenario blocks;
-- stronger optimization baseline(s), preferably rolling-horizon;
-- stronger sequential learning baseline(s), e.g. PPO/MAPPO/MARL where appropriate;
-- stochastic replications/common-random-number evaluation;
-- objective-weight sensitivity;
-- richer abstract swarm behaviors;
-- tail-risk/CVaR evaluation;
-- calibration against defensible public data/literature where possible;
-- runtime/scaling measurements;
-- versioned protocols and reproducible artifacts.
-
-Do not collapse Level A or B evidence into Level C claims.
+Before deployment/customer/investor superiority claims, add stronger optimization and RL/MARL baselines, common-random-number/stochastic replication, richer uncertainty and scenario families, tail-risk/CVaR evaluation, objective-weight sensitivity, runtime/scaling, calibration to defensible public literature/data where possible, and versioned reproducible protocols.
 
 ---
 
 # 5. Current simulator and evaluation model
 
-The current simulator is synthetic and normalized.
+The simulator is synthetic and normalized. Core elements include heterogeneous `DIRECT`, `FAST`, and `DECOY` threats; protected assets; finite-capacity defenders/resources; probabilistic sensors; seeded scenario generation; abstract interaction success; penetration/damage; and a repeated `sense -> assign -> resolve -> move -> penetrate` loop.
 
-Core elements include:
+Typical default scenario: 30 threats, 8 defenders, 2 assets, 3 sensors, 20% decoys, 25% fast threats, maximum 150 steps.
 
-- heterogeneous threat types: `DIRECT`, `FAST`, `DECOY`;
-- protected assets;
-- defenders/resources with range, finite capacity/uses, availability and assignment state;
-- sensors with probabilistic distance-dependent detection;
-- seeded scenario generation;
-- abstract interaction success probability;
-- penetration and abstract asset damage;
-- repeated `sense -> assign -> resolve -> move -> penetrate` loop.
+Primary KPI: `asset_survival_rate`.
 
-Typical default scenario:
+Secondary metrics: containment, penetrations, cumulative damage, defenders consumed, response delay, and runtime.
 
-- 30 threats;
-- 8 defenders;
-- 2 assets;
-- 3 sensors;
-- 20% decoys;
-- 25% fast threats;
-- maximum 150 steps.
-
-Primary KPI:
-
-- `asset_survival_rate`
-
-Secondary metrics:
-
-- `containment_rate`;
-- `penetrations`;
-- `cumulative_damage`;
-- `defenders_consumed`;
-- `mean_response_delay`;
-- runtime as a separate systems metric.
-
-Current scalar training loss:
+Current scalar loss:
 
 ```text
 100 * (1 - survival)
@@ -222,93 +141,41 @@ Current scalar training loss:
 
 Fitness is `max(0, 200 - loss)`.
 
-These weights are research design choices, not physical doctrine. They must eventually receive sensitivity analysis.
-
-## Important simulator caveat
-
-Policies currently run on the same scenario seed, but policy-dependent interaction calls can consume RNG in different sequences. This means the simulator is not yet using a perfect common-random-number/random-tape design for every stochastic event.
-
-A future simulator version should consider indexed random tapes or stochastic replications per scenario. Do not silently change this during an active evidence protocol; doing so creates a new simulator version and invalidates direct comparability.
+Important caveat: policies share scenario seeds but stochastic interaction RNG is not yet indexed by event/policy-independent random tapes. A future simulator version should improve common-random-number coupling; do not silently change this during an active evidence protocol.
 
 ---
 
-# 6. Baselines and what they actually represent
+# 6. Baselines and interpretation
 
-Current baseline families include:
+Current baselines include random, closest, highest-risk, greedy risk/cost, per-step Hungarian assignment, simple tabular Q-learning, local/evolutionary search, and Axplorer-style generative proposal + local refinement.
 
-- random assignment;
-- closest threat;
-- highest risk;
-- greedy risk/cost;
-- per-step Hungarian assignment;
-- simple tabular Q-learning over a small strategy-template set;
-- local/evolutionary search;
-- Axplorer-style transformer proposal + local refinement.
+The current Hungarian baseline is a **myopic per-step bipartite assignment optimizer**, not a rolling-horizon/MILP/MPC state-of-the-art optimizer.
 
-Critical interpretation rules:
+The current Q-learning baseline is a **small tabular/template RL baseline**, not PPO/MAPPO/MARL.
 
-- The current Hungarian baseline is a **myopic per-step bipartite assignment optimizer**, not a rolling-horizon/MILP/MPC state-of-the-art optimizer.
-- The current Q-learning baseline is a **small tabular/template RL baseline**, not PPO/MAPPO/MARL or a comprehensive state-of-the-art RL baseline.
-
-Therefore never write:
-
-- "AegisSwarm beats optimization";
-- "AegisSwarm beats reinforcement learning";
-- "transformers are superior to optimization/RL";
-
-based only on the current baselines.
-
-Acceptable language is narrower, e.g.:
-
-- "The structured policy outperformed the current myopic Hungarian baseline in this simulator."
-- "The current tabular Q-learning baseline was weaker than structured search."
-- "The learned proposer did/did not add value over an equally budgeted local-search comparator under this protocol."
+Never generalize current results into "AegisSwarm beats optimization" or "AegisSwarm beats RL."
 
 ---
 
-# 7. Strategy representation history
+# 7. Representation history
 
-## 7.1 Legacy 8-gene representation
+## 7.1 Legacy 8-gene strategy
 
-The original policy encoded eight global strategy weights such as urgency, defender distance, type priority, assignment stickiness, resource preservation, decoy penalty, and reserve threshold.
-
-This search space was small and smooth enough that conventional local search was very competitive.
-
-Important development result on the original 100-scenario evaluation:
-
-| Method | Asset survival |
-|---|---:|
-| Q-learning | 35.5% |
-| legacy Axplorer | 58.0% |
-| legacy local search | 74.5% |
-
-Interpretation: the original learned proposer did **not** justify itself. Local search was substantially better.
+Original development result: Q-learning 35.5%, legacy Axplorer 58.0%, legacy local search 74.5%. Conclusion: original learned proposer did not justify itself.
 
 ## 7.2 Structured 12-rule / 60-token programs
 
-The project then moved to a larger ordered rule program. Each rule has five token fields conceptually corresponding to:
+Each rule contains `enabled | condition | threshold | action | magnitude`. Conditions include urgency, distance, threat type, low resources, and high damage. Actions include priority changes, reserve/release reserve, stickiness, and decoy penalties.
 
-```text
-enabled | condition | threshold | action | magnitude
-```
-
-Current abstract conditions include ideas such as urgency, defender distance, threat type, low resources, and accumulated asset damage.
-
-Current abstract actions include priority changes, reserve/release-reserve behavior, stickiness, and decoy penalties.
-
-The structured representation was intended to give search a meaningful combinatorial language rather than a tiny vector of global weights.
+This representation produced the first strong structured policies and remains the current strong comparator.
 
 ---
 
-# 8. Experiment ledger — what has actually happened
-
-This section is the canonical historical record. If a future run supersedes these numbers, append a new entry rather than silently rewriting history.
+# 8. Experiment ledger
 
 ## Experiment 0 — original heuristic/learning proof
 
-100 held-out-like scenarios were used before the methodology was fully frozen.
-
-Approximate key results:
+Approximate 100-scenario development results:
 
 | Method | Survival |
 |---|---:|
@@ -321,40 +188,22 @@ Approximate key results:
 | legacy local | 74.5% |
 | legacy Axplorer | 58.0% |
 
-Conclusion: structured/search-based policies looked promising, but the original Axplorer implementation was weaker than conventional local search.
+## Experiment 1 — structured representation development
 
-## Experiment 1 — structured representation development ablation
+Seeds 2000–2099, inspected during architecture iteration:
 
-On the 100-scenario development evaluation (seeds 2000–2099), after introducing the 12-rule/60-token program:
+| Method | Survival |
+|---|---:|
+| legacy local | 74.5% |
+| legacy Axplorer | 58.0% |
+| structured local | 80.5% |
+| structured Axplorer V1 | 87.5% |
 
-| Method | Survival | Containment | Penetrations | Damage |
-|---|---:|---:|---:|---:|
-| legacy local | 74.5% | 58.1% | 2.92 | 2.080 |
-| legacy Axplorer | 58.0% | 48.2% | 4.12 | 2.883 |
-| structured local | 80.5% | 61.9% | 2.28 | 1.599 |
-| structured Axplorer V1 | 87.5% | 65.5% | 1.98 | 1.398 |
+Promising development evidence only; not final.
 
-This looked excellent, but these scenarios had been inspected during architecture iteration. They were therefore reclassified as **development-test**, not final evidence.
+## Experiment 2 — V1 formal frozen holdout
 
-Interpretation:
-
-- structured representation clearly looked stronger than legacy representation;
-- V1 Axplorer appeared better than structured local search on this development block;
-- result was promising but not unbiased final evidence.
-
-## Experiment 2 — formal V1 frozen holdout
-
-Protocol included:
-
-- 5 matched training/search seeds;
-- identical 16-scenario training bundle;
-- 1,800 unique candidate-policy evaluations per method/run;
-- structured local vs structured Axplorer V1;
-- 400 untouched scenarios, seeds 2100–2499;
-- hierarchical bootstrap and paired sign-flip testing;
-- stress families.
-
-Final primary result:
+5 matched search runs, 1,800 unique candidate evaluations/run, 400 untouched scenarios 2100–2499:
 
 ```text
 structured local survival:    0.800
@@ -364,660 +213,284 @@ Axplorer - local:              +0.0132
 paired p-value:                0.160042
 ```
 
-Conclusion:
+Conclusion: **no statistically robust Axplorer advantage**.
 
-> **V1 did not establish a statistically robust Axplorer advantage over structured local search.**
+## Experiment 3 — Axplorer V2 development
 
-The correct interpretation is statistical parity with a small positive point estimate, not a transformer victory.
-
-## Experiment 3 — Axplorer V2
-
-V2 changed the learned proposer while keeping the simulator/objective/rule language/comparator concept stable.
-
-V2 introduced:
-
-- fitness/rank conditioning;
-- score-weighted likelihood training;
-- field-specific grammar heads;
-- canonical program encoding;
-- a multi-objective diversity archive.
-
-Development block: seeds 3000–3399.
-
-Full V2 development result:
+Seeds 3000–3399:
 
 ```text
-structured local survival:     0.794
-Axplorer V2 survival:           0.810
-V2 - local:                     +0.0168
-95% hierarchical CI:           [-0.0350, +0.0773]
-paired sign-flip p-value:       0.003700
+structured local:      0.794
+Axplorer V2:            0.810
+V2 - local:            +0.0168
+hierarchical CI:       [-0.0350, +0.0773]
+sign-flip p-value:      0.003700
 ```
 
-Interpretation:
+Small positive point estimate, but training-run uncertainty remains material. Do not claim robust superiority.
 
-- V2 has a small positive point estimate (+1.68 pp);
-- scenario-level paired differences appear fairly consistent under the sign-flip test;
-- training-run uncertainty remains large enough that the hierarchical CI crosses zero;
-- with only five independently trained policies, do **not** claim a robust effect size;
-- **do not consume the V2 confirmation set yet** solely because p < 0.05 under one test.
+## Experiment 4 — fixed-strategy hybrid executor ablation
 
-The mismatch between sign-flip significance and the hierarchical CI should be cleaned up by aligning the primary estimand/test before publication-quality reporting.
-
-## Experiment 4 — post-hoc hybrid executor ablation
-
-Question: if we hold already-discovered strategies fixed and replace greedy execution with a Hungarian optimizer, does optimization add value?
-
-Fresh hybrid development block: seeds 4000–4399.
-
-Full 400-scenario results:
+Seeds 4000–4399:
 
 | Variant | Survival |
 |---|---:|
 | fixed optimizer only | 31.0% |
-| local strategy + greedy | 80.0% |
-| local strategy + optimizer | 79.5% |
-| V2 strategy + greedy | 80.5% |
-| V2 strategy + optimizer | 80.5% |
+| local + greedy | 80.0% |
+| local + optimizer | 79.5% |
+| V2 + greedy | 80.5% |
+| V2 + optimizer | 80.5% |
 
-Key comparisons:
+Conclusion: **swapping an optimizer under strategies trained for greedy execution did not help**. Strategy/executor must be trained jointly/in-loop.
+
+## Experiment 5 — hybrid objective learning
+
+Seeds 5000–5399. Every candidate strategy was evaluated through the optimizer during search.
 
 ```text
-optimizer effect on V2:         -0.0003
-95% CI:                          [-0.01475, +0.016]
-p-value:                         1.000000
-
-V2 strategy effect w/ optimizer: +0.0100
-95% CI:                          [-0.0525, +0.0823]
-p-value:                         0.061047
+fixed_optimizer: 0.320
+hybrid_local:     0.805 CI=[0.77624375, 0.83100625]
+hybrid_axplorer:  0.810 CI=[0.77775, 0.841]
+Axplorer - local: +0.0055 CI=[-0.0235, +0.0320]
+p-value:          0.507075
 ```
 
-Conclusion:
+Conclusions:
 
-> **Naively swapping an optimizer underneath strategies trained for greedy execution did not help.**
+- optimizer-aware objective search is highly valuable relative to the current fixed hand-written objective in this synthetic simulator;
+- Axplorer is statistically tied with optimizer-aware local/evolutionary search;
+- **NO FREEZE, NO CONFIRMATION**;
+- proposer choice is deprioritized;
+- repeated ~80–81% results suggest a representation/planning ceiling.
 
-This does not imply optimization is useless. It implies the strategy and executor are coupled and should be trained jointly/in-loop.
+## Experiment 6 — optimizer-native objective representation (ACTIVE)
 
-The very large gap between the crude fixed optimizer and strategy-guided variants also suggests that objective quality is critical: an exact optimizer can still solve the wrong objective perfectly.
+### V1 quick — invalidated before full development
 
-This result caused the current architectural pivot.
+The first 10-parameter native representation used a zero-centred utility and omitted important state-reactive information. Quick mode on the first 20 development scenarios produced:
 
-## Experiment 5 — hybrid objective learning (ACTIVE)
+```text
+fixed_optimizer:   0.350
+rule_objective:    0.688 CI=[0.400, 0.925]
+native_v1:         0.300 CI=[0.175, 0.425]
+native - rule:    -0.3875 CI=[-0.650, -0.075]
+p-value:            0.000100
+```
 
-Active protocol: `aegisswarm-hybrid-objective-v1`.
+This was a **diagnostic integration/development result, not evidence against optimizer-native objectives generally**. V1 was stopped before the full 5×1,800 campaign.
 
-Active branch: `agent/hybrid-objective-learning`.
+Diagnosis:
 
-Core change:
+- unlike the rule-guided policy, V1 had no guaranteed positive structural base utility;
+- many candidates could prefer no-op assignments simply because utilities remained non-positive;
+- V1 discarded state-reactive target-damage and reserve/release interactions.
 
-> **Every searched candidate strategy is now evaluated through the same rule-guided Hungarian optimizer during training.**
+### V2 — current active protocol
 
-We are no longer training for greedy execution and swapping an optimizer in afterward.
+Protocol: `aegisswarm-optimizer-native-objective-v2`.
 
-Development comparison:
+V2 shares the rule-guided policy's structural base:
+
+```text
+2 * abstract threat-type prior
++ inverse target-asset distance term
++ inverse defender/threat distance term
+```
+
+It then searches 14 smooth state modifiers covering urgency, asset value, threat-class modifiers, defender/threat closeness, defender capacity, resource scarcity, reserve threshold, release-urgency threshold, persistence, speed, target damage, and urgency×scarcity.
+
+Primary comparison:
 
 ```text
 fixed objective + optimizer
-hybrid local-search objective + optimizer
-hybrid Axplorer objective + optimizer
+60-token searched rule objective + optimizer
+14-parameter optimizer-native V2 objective + optimizer
 ```
 
-Fairness controls:
+Both searched representations start from stochastic candidates and use the same local/evolutionary search family, matched seeds, and candidate budget.
 
-- 5 matched search seeds in full mode;
-- 16 fixed training scenarios;
-- 1,800 unique candidate evaluations per method/run;
-- same optimizer for local and Axplorer candidates;
-- same rule language;
-- same simulator and scoring;
-- fresh development scenarios.
+Development: 9000–9399. The first 20 seeds have already been inspected by V1 quick, so this block is development-only.
 
-Quick integration/development result (20 scenarios; **not evidence**):
+Reserved confirmation: 10000–10399, still untouched and code-gated.
 
-```text
-fixed_optimizer survival: 0.275
-hybrid_local survival:     0.675   CI=[0.500, 0.800]
-hybrid_axplorer survival:  0.725   CI=[0.525, 0.900]
-Axplorer - local:           +0.0500 CI=[-0.125, +0.225]
-paired p-value:             0.583321
-```
-
-Interpretation: the pipeline works and optimizer-aware search can find materially stronger objectives than the fixed optimizer even in the tiny run, but the Axplorer-vs-local difference is far too uncertain to interpret.
-
-**Next action:** run the full 400-scenario development protocol on seeds 5000–5399. Do not run confirmation first.
+V2 writes to fresh `artifacts/optimizer_native_v2_*` paths so malformed V1 quick artifacts cannot be resumed.
 
 ---
 
-# 9. Seed/evidence ledger — preserve this rigorously
+# 9. Seed/evidence ledger
 
 | Seed block | Status | Meaning |
 |---|---|---|
-| 0–255 | training pool | candidate scoring/training; not evidence |
-| 1000–1099 | validation | earlier validation/integration work |
-| 2000–2099 | consumed development-test | repeatedly inspected during structured architecture work |
-| 2100–2499 | consumed V1 final holdout | V1 formal confirmation; never call untouched again |
-| 3000–3399 | consumed V2 development | may guide V2 architecture decisions |
-| 4000–4399 | consumed hybrid-executor development | used to study executor swap |
-| 5000–5399 | **ACTIVE hybrid-objective development** | may guide current architecture |
-| 6000–6399 | reserved V2 confirmation | untouched; do not use unless V2 architecture is explicitly frozen |
-| 7000–7399 | reserved hybrid-executor confirmation | untouched; likely obsolete unless that architecture is revived/frozen |
-| 8000–8399 | **reserved hybrid-objective confirmation** | untouched; do not run until current architecture is frozen |
+| 0–255 | training pool | candidate scoring/training |
+| 1000–1099 | validation | earlier integration/model selection |
+| 2000–2099 | consumed development-test | structured architecture work |
+| 2100–2499 | consumed V1 final holdout | V1 formal confirmation |
+| 3000–3399 | consumed V2 development | proposer development |
+| 4000–4399 | consumed hybrid-executor development | executor swap |
+| 5000–5399 | consumed hybrid-objective development | optimizer-aware strategy search |
+| 6000–6399 | reserved V2 confirmation | untouched |
+| 7000–7399 | reserved executor-swap confirmation | untouched/likely obsolete |
+| 8000–8399 | reserved hybrid-objective confirmation | untouched; do not use |
+| 9000–9399 | active optimizer-native development | development-only; first 20 inspected by V1 quick |
+| 10000–10399 | reserved optimizer-native confirmation | untouched; do not use until freeze |
 
-Rules:
-
-1. Never tune after inspecting a confirmation block and still call it confirmation.
-2. Never reuse a consumed block as "new" evidence.
-3. When architecture changes materially, prefer a fresh development block and reserve a fresh confirmation block.
-4. Record seed ranges in every report and protocol artifact.
-5. If the simulator/scoring semantics change, treat old evidence as belonging to the old simulator version.
+Never reuse consumed blocks as new evidence. Never tune on confirmation and still call it confirmation.
 
 ---
 
-# 10. Statistics and evidence policy
+# 10. Statistics/evidence policy
 
-Primary evaluation should account for both:
+Account for scenario uncertainty and training/search-run uncertainty. Current tools include hierarchical bootstrap CIs and paired sign-flip tests. Do not announce significance from one p-value when the effect-size CI still materially crosses zero without explaining estimand differences.
 
-- scenario uncertainty;
-- training/search-seed uncertainty.
-
-Current formal tooling includes hierarchical bootstrap confidence intervals and paired sign-flip tests.
-
-Do not announce significance from one p-value when the effect-size CI still materially crosses zero without explaining the estimand difference.
-
-Preferred publication-grade approach:
-
-1. define the primary estimand before confirmation;
-2. use a hierarchical paired procedure that treats independently trained policies as a first-level source of variation and scenarios as a second level;
-3. report point estimate, 95% CI, and a compatible hypothesis test;
-4. report absolute survival difference in percentage points;
-5. also report containment, penetration, damage, resources, response delay, and runtime;
-6. report per-training-run effects, not just pooled averages;
-7. consider more than five training seeds if run-to-run variance remains the dominant uncertainty.
-
-A positive point estimate alone is not proof.
-
-Preferred criterion before spending a fresh confirmation set:
-
-- architecture/hyperparameters frozen;
-- development effect is operationally meaningful, not merely detectable;
-- ideally the hierarchical 95% CI lower bound is above zero, or there is otherwise a strong pre-specified reason to confirm;
-- no unresolved correctness bugs;
-- quick/integration and full development artifacts are reproducible.
+Before confirmation, define the primary estimand/test, report point estimate + compatible 95% CI, report per-training-run effects, and preferably require an operationally meaningful effect rather than merely a positive point estimate.
 
 ---
 
-# 11. Current active architecture and files
+# 11. Current active files
 
-The active branch is `agent/hybrid-objective-learning`.
+Important files include:
 
-Important files:
+- `aegisswarm/simulator.py`, `scenarios.py`, `models.py` — environment;
+- `aegisswarm/rule_program.py` — strong 60-token state-reactive representation;
+- `aegisswarm/hybrid.py` — rule-guided Hungarian executor;
+- `aegisswarm/hybrid_objective.py` — optimizer-aware rule search;
+- `aegisswarm/optimizer_native.py` — optimizer-native V2 representation/search;
+- `aegisswarm/optimizer_native_proof.py` — active V2 protocol/evaluation;
+- `aegisswarm/optimizer_native_cli.py` — active CLI;
+- `aegisswarm/splits.py` — seed/evidence ledger;
+- `docs/AEGISSWARM_STATUS.md` — current-state overlay.
 
-- `aegisswarm/models.py` — scenario entities;
-- `aegisswarm/scenarios.py` — seeded synthetic scenario generation;
-- `aegisswarm/simulator.py` — simulation loop;
-- `aegisswarm/policies.py` — heuristic baselines;
-- `aegisswarm/optimization.py` — current fixed Hungarian baseline;
-- `aegisswarm/rule_program.py` — 12-rule/60-token strategy language;
-- `aegisswarm/rule_search.py` — structured program evaluation/search utilities;
-- `aegisswarm/axplorer_v2.py` — fitness-conditioned grammar-aware learned proposer;
-- `aegisswarm/hybrid.py` — `RuleGuidedHungarianPolicy`; strategy-derived utility + exact assignment;
-- `aegisswarm/hybrid_search.py` — hybrid program scoring;
-- `aegisswarm/hybrid_ablation.py` / `hybrid_cli.py` — fixed-strategy executor ablation;
-- `aegisswarm/hybrid_objective.py` — optimizer-aware local/Axplorer training;
-- `aegisswarm/hybrid_objective_proof.py` — active protocol/evaluation/reporting;
-- `aegisswarm/hybrid_objective_cli.py` — active experiment CLI;
-- `aegisswarm/splits.py` — canonical seed/evidence blocks;
-- `aegisswarm/final_proof.py` — V1 statistical/reporting utilities and legacy formal protocol;
-- `tests/` — regression/integration tests.
+Current branch: `agent/optimizer-native-objective`.
 
-Current draft PR:
-
-- PR #2: `Train learned strategies through optimized execution`
-- head: `agent/hybrid-objective-learning`
-- base: `agent/hybrid-aegis`
-
-The branch ancestry intentionally preserves the experiment progression. Do not blindly squash/merge old experimental branches without deciding how the final history should be represented.
+Current draft PR: PR #3, `Test optimizer-native strategic objective representation`.
 
 ---
 
-# 12. Known implementation lessons / bugs already encountered
+# 12. Known implementation lessons
 
-Do not rediscover these if avoidable.
+## Multiprocessing worker shadowing
 
-## Multiprocessing worker-name shadowing
-
-`final_proof.py` historically defined two helpers with the same `_evaluate_program_worker` name: one accepted `(tokens, config)`, another accepted one packed evaluation payload. Python kept the later definition, causing spawn/process-pool calls to fail with:
-
-```text
-TypeError: _evaluate_program_worker() takes 1 positional argument but 2 were given
-```
-
-Subsequent branches added explicit spawn-safe dispatch/worker handling and regression tests. When adding new process-pool code, use unambiguous top-level worker functions with picklable payloads.
+Avoid duplicate top-level worker names/signatures; macOS spawn exposed this earlier.
 
 ## Diversity archive metric mismatch
 
-Axplorer V2 initially ranked archive niches by `penetrations`, while the training evaluator cache omitted that metric, causing:
+Keep evaluator metric schemas synchronized with archive ranking requirements.
 
-```text
-KeyError: 'penetrations'
-```
+## Native V1 zero-centred utility
 
-The evaluator was expanded to expose penetrations without changing the scalar fitness objective. Keep archive requirements and evaluator metric schemas synchronized.
-
-## macOS / Apple Silicon
-
-The primary development environment is Apple Silicon, with PyTorch MPS used for transformer training and CPU process pools used for simulator candidate scoring. Always exercise spawn multiprocessing in tests; fork-only assumptions are unsafe on macOS.
+When comparing strategic representations, preserve equivalent structural semantics. V1 accidentally made the new representation learn basic positive assignment utility that the rule comparator received for free. V2 fixes this by sharing the same structural base utility and changing only the strategic modifiers.
 
 ---
 
-# 13. What the active hybrid-objective experiment is trying to learn
+# 13. Current decision tree
 
-The previous hybrid ablation showed that an optimizer does not automatically improve a strategy that was trained for another executor.
+## If optimizer-native V2 clearly beats the 60-token rule representation
 
-The active architecture instead evaluates:
+Inspect secondary metrics and run stability. If the effect is operationally meaningful and robust, freeze architecture/hyperparameters before using 10000–10399 confirmation.
 
-```text
-candidate rule program
-        |
-        v
-strategic pair utility + reserve intent
-        |
-        v
-Hungarian assignment optimizer
-        |
-        v
-simulated outcome
-        |
-        v
-fitness returned to search
-```
+## If V2 ties the rule representation near the existing plateau
 
-This turns the strategy learner into an **objective designer** for a constrained optimizer.
+Stop representation tuning. Move to a new protocol testing a short rolling-horizon/MPC-style abstract planner. Keep the stronger/simpler representation fixed.
 
-Mathematically, the conceptual form is:
+## If V2 remains materially worse
 
-```text
-theta -> U_theta(state, defender, threat)
-      -> argmax_x sum U_theta * x
-      -> outcome -> fitness(theta)
-```
-
-where `theta` is the rule program and `x` is a feasible assignment.
-
-This is a much stronger division of labor than asking a transformer to imitate combinatorial optimization.
+Keep the 60-token rule representation and move to planning. Do not keep expanding the vector merely to force a win.
 
 ---
 
 # 14. Immediate runbook
 
-## Current next command — full development
+```bash
+git checkout agent/optimizer-native-objective
+git pull origin agent/optimizer-native-objective
+pytest -q
+python -m aegisswarm.optimizer_native_cli --quick --workers 4
+```
 
-After quick mode passes, run:
+If V2 quick no longer shows pathological native under-assignment, run:
 
 ```bash
-python -m aegisswarm.hybrid_objective_cli \
-  --workers 6 \
-  --device mps
+python -m aegisswarm.optimizer_native_cli --workers 6
 ```
 
-Expected development block:
-
-- 5 matched search seeds;
-- 16 training scenarios;
-- 1,800 unique candidate evaluations per method/run;
-- 400 evaluation scenarios, seeds 5000–5399.
-
-Output should include:
-
-```text
-=== HYBRID OBJECTIVE LEARNING ===
-fixed_optimizer survival: ...
-hybrid_local survival:    ...
-hybrid_axplorer survival: ...
-difference (A-L):         ...
-paired p-value:           ...
-```
-
-Artifacts default to:
-
-```text
-artifacts/hybrid_objective_dev/
-```
-
-## Do not run yet
-
-```bash
-python -m aegisswarm.hybrid_objective_cli --confirm ...
-```
-
-Confirmation seeds 8000–8399 must remain untouched until an explicit architecture-freeze decision.
+Do not run `--confirm` automatically.
 
 ---
 
-# 15. Decision tree after active full development
+# 15. Next architecture stage if representation does not break the plateau
 
-## Case A — hybrid Axplorer clearly and meaningfully beats hybrid local
+Test a short rolling-horizon planner rather than one-step Hungarian matching. The goal is to model temporal consequences such as future resource scarcity, assignment congestion, reserve value, and delayed effects. This should be a new protocol because execution semantics change.
 
-Example desirable pattern:
-
-- positive effect of several percentage points;
-- hierarchical CI substantially above zero;
-- effect visible across training seeds;
-- no severe resource/runtime tradeoff;
-- no correctness concerns.
-
-Then:
-
-1. freeze architecture and hyperparameters;
-2. record commit SHA/protocol ID;
-3. run `8000–8399` confirmation exactly once;
-4. do not tune on the confirmation result;
-5. if confirmed, move to stronger external baselines and robustness work.
-
-## Case B — hybrid Axplorer and hybrid local are tied
-
-Do **not** burn confirmation.
-
-Use 5000–5399 as development evidence to diagnose:
-
-- model collapse/diversity;
-- insufficient training-seed count;
-- rule-language bottlenecks;
-- objective parameterization;
-- whether local refinement is doing nearly all useful work;
-- whether transformer compute is justified by marginal gain.
-
-A future architecture change should get a new protocol ID and, if material, a new development/confirmation block.
-
-## Case C — hybrid local clearly wins
-
-Treat that as useful evidence. Do not preserve Axplorer for branding reasons.
-
-Possible conclusions:
-
-- learned generative proposal is not buying enough search efficiency;
-- local/evolutionary search may be the correct offline strategy learner;
-- use ML elsewhere (state representation, uncertainty prediction, behavior forecasting, adaptation) rather than forcing it into strategy generation.
-
-The end goal is the best system, not proving a favored algorithm.
+After that, consider stronger sequential learning baselines, uncertainty/partial-observation improvements, simulator random tapes/stochastic replications, richer abstract scenario families, and tail-risk/CVaR metrics.
 
 ---
 
-# 16. Next architecture stages after hybrid-objective learning
+# 16. External deadline / iDEX
 
-Do not implement all of these at once. Advance one hypothesis at a time with ablations.
+Current tracked external target: iDEX Open Challenge deadline **30 September 2026, 11:59 PM**, last verified on the official site on 2026-08-17. Re-verify before submission work.
 
-## Stage 1 — stronger optimizer
-
-The current Hungarian solver is myopic. A likely next step is a short rolling-horizon optimizer / MPC-style planner that anticipates future state/resource scarcity.
-
-Goal: test whether strategic learning adds more value when paired with an optimizer capable of temporal planning.
-
-## Stage 2 — richer strategic parameterization
-
-The current rule language may be expanded or replaced by a more optimizer-native objective representation, e.g. abstract weights for:
-
-- threat urgency;
-- asset value/risk;
-- fast/direct threat premiums;
-- decoy discount;
-- distance cost;
-- resource scarcity;
-- reserve policy;
-- assignment persistence;
-- uncertainty/risk aversion;
-- tail-risk penalty.
-
-Keep it abstract and defensive.
-
-## Stage 3 — stronger sequential learning baseline
-
-Add stronger RL/MARL only when the environment supports a meaningful sequential-learning question. Potential families include PPO/MAPPO-style baselines, but the experiment must be compute/budget conscious and correctly specified.
-
-Do not add RL merely to claim it was beaten.
-
-## Stage 4 — uncertainty and partial observation
-
-Improve sensing uncertainty, track confidence, degraded sensors, and state estimation. Evaluate robustness to observation noise and distribution shift.
-
-## Stage 5 — simulator v2 / random tapes
-
-Introduce event-indexed random tapes or repeated stochastic replications so policy comparisons get cleaner common-random-number coupling.
-
-This should be a new simulator/protocol version, not a silent patch to an active final experiment.
-
-## Stage 6 — richer abstract swarm behavior
-
-Potential behavior families:
-
-- direct attack;
-- clustered waves;
-- split/multi-axis approach;
-- decoy screening;
-- retargeting;
-- stochastic maneuver;
-- changing composition;
-- sensor degradation;
-- resource-poor scenarios.
-
-Keep these abstract, not operationally prescriptive.
-
-## Stage 7 — tail-risk and mission-level metrics
-
-Add metrics such as:
-
-- protected-value survival;
-- leakage fraction;
-- resource per contained threat;
-- worst-decile performance;
-- CVaR / tail damage;
-- robustness across scenario families;
-- runtime/scaling.
+Internal working intent: reach one strongest reproducible architecture and core ablations by late August/early September, then freeze the technical story and build the evidence/submission package. Do not invent deployment readiness or real-world performance from the synthetic simulator.
 
 ---
 
-# 17. External deadline and submission context
+# 17. Claims policy
 
-## iDEX Open Challenge — primary external deadline
+Supported inside the synthetic environment:
 
-**Verified from the official iDEX website on 2026-08-17:**
+- structured/search-based strategy is substantially stronger than early simple baselines;
+- V1 Axplorer did not robustly beat structured local search on its untouched holdout;
+- V2 Axplorer produced only a small uncertain development increment;
+- swapping an optimizer under greedily trained strategies did not help;
+- searching the objective with the optimizer in-loop is substantially stronger than the current fixed hand-written objective;
+- Axplorer and optimizer-aware local/evolutionary search are statistically tied under the completed hybrid-objective protocol.
 
-- Open Challenge page currently indicates the challenge is open;
-- deadline: **30 September 2026, 11:59 PM**;
-- grant support: **up to ₹1.5 crore**;
-- eligible applicant categories include recognized startups, Indian MSMEs/companies, and individual innovators; research/academic institutions may use the individual-innovator route according to the official FAQ.
+Not supported:
 
-Official sources to re-check before relying on this section:
-
-- `https://www.idex.gov.in/disc-category/18`
-- `https://idex.gov.in/faq`
-
-**Never trust this deadline indefinitely. Re-verify the official page when doing submission work.**
-
-The Open Challenge is particularly relevant because it permits innovators to propose their own defence/aerospace problem/solution rather than requiring a currently listed problem statement.
-
-## Recommended internal working gates toward 30 September 2026
-
-These are project management targets, not official deadlines. Adjust if experiments invalidate the architecture.
-
-### By ~24 August
-
-- finish hybrid-objective full development;
-- make explicit freeze / no-freeze decision;
-- if no-freeze, choose exactly one next architecture hypothesis rather than proliferating models.
-
-### By ~31 August
-
-- have one strongest reproducible architecture candidate;
-- complete core ablations;
-- resolve the primary statistical estimand/reporting mismatch;
-- decide whether an untouched confirmation run is justified.
-
-### By ~7 September
-
-- complete the strongest available confirmation/evidence package if architecture is frozen;
-- compile stress results and failure modes;
-- identify stronger baseline gaps that must be disclosed or filled.
-
-### By ~14 September
-
-- freeze the technical story for the iDEX application;
-- prepare system architecture, novelty, validation methodology, TRL/prototype status, milestones, funding use, risks, and integration concept;
-- avoid inventing deployment readiness that the simulator does not establish.
-
-### By ~21 September
-
-- draft complete iDEX technical/financial proposal package;
-- perform evidence and claim audit;
-- ensure every performance claim maps to a reproducible artifact/protocol.
-
-### By ~27 September
-
-- final review and submission buffer;
-- re-check official portal requirements/deadline;
-- avoid waiting until 30 September for first upload/submission attempt.
-
-### 30 September 2026, 11:59 PM
-
-- current official iDEX Open Challenge deadline as verified 2026-08-17.
+- Axplorer superiority;
+- superiority to optimization generally;
+- superiority to state-of-the-art RL/MARL;
+- state-of-the-art counter-swarm superiority;
+- real-world effectiveness percentages;
+- deployment readiness.
 
 ---
 
-# 18. iDEX positioning — only after evidence
+# 18. Development philosophy
 
-Potential eventual positioning:
-
-> AegisSwarm is a simulation-first AI decision-support and coordination layer for heterogeneous counter-swarm defence, combining learned strategic objective design with constrained resource optimization and explicit safety/override logic.
-
-Do not position it as a deployable autonomous weapon system.
-
-What an iDEX evidence package should eventually contain:
-
-- clearly defined operational coordination problem;
-- architecture diagram;
-- simulator/prototype demonstration;
-- algorithmic novelty;
-- fair baselines;
-- held-out evidence with uncertainty;
-- stress/failure analysis;
-- runtime/scalability;
-- human-supervision/override concept;
-- data/integration interfaces at an abstract level;
-- development milestones and requested funding;
-- honest limitations and validation plan.
-
-The strongest pitch is not "we used a transformer." It is:
-
-> **We built a disciplined hybrid decision architecture and can quantitatively show what each layer contributes under controlled disruption/stress scenarios.**
+1. Performance first, narrative second.
+2. One hypothesis at a time.
+3. Keep strong comparators.
+4. Exploit complementarity between learning/search and optimization.
+5. Measure marginal contribution by ablation.
+6. Protect holdouts.
+7. Preserve negative results.
+8. Prefer reproducibility to one-off numbers.
+9. Record architecture changes caused by inspected development results.
+10. The final system can be hybrid even if no learned component individually beats every classical framework.
 
 ---
 
-# 19. Claims policy
-
-## Claims currently supported inside the synthetic simulator
-
-Reasonable:
-
-- structured rule policies were substantially stronger than the original 8-gene representation in development experiments;
-- structured search policies materially outperform the current simple heuristic, tabular-Q, and myopic fixed-objective baselines in this synthetic environment;
-- V1 Axplorer did not robustly beat structured local search on the untouched V1 holdout;
-- V2 produced a small positive development effect but with material training-run uncertainty;
-- merely swapping a Hungarian executor underneath strategies trained for greedy execution did not improve performance;
-- this motivated optimizer-aware strategy learning.
-
-## Claims not currently supported
-
-Do not say:
-
-- "AegisSwarm is proven superior to state-of-the-art counter-swarm systems";
-- "AegisSwarm beats reinforcement learning";
-- "AegisSwarm beats optimization";
-- "Axplorer is statistically proven superior" based on current V1/V2 evidence;
-- "ready for deployment";
-- "validated on real military data";
-- "87.5% final performance" — that number came from a development evaluation;
-- any real-world effectiveness percentage inferred from synthetic survival rates.
-
----
-
-# 20. Development philosophy
-
-When deciding what to do next, follow these rules:
-
-1. **Performance first, narrative second.** Do not optimize customer/investor positioning before technical evidence.
-2. **One hypothesis at a time.** Avoid changing representation, optimizer, simulator, score, and model simultaneously.
-3. **Keep a strong comparator.** Local/evolutionary search is not the enemy; if it is best, use it.
-4. **Exploit complementarity.** If optimization solves a subproblem exactly, use it rather than asking a transformer to relearn it.
-5. **Measure marginal contribution.** Every major component should survive an ablation.
-6. **Protect holdouts.** Fresh evidence is scarce; do not casually spend it.
-7. **Do not hide negative results.** V1 parity and no-gain hybrid executor swap are valuable architecture evidence.
-8. **Prefer reproducibility over impressive one-off numbers.** Multiple training seeds and fixed protocols matter.
-9. **Record architecture changes caused by inspected development results.** This preserves scientific honesty.
-10. **The final system can be hybrid even if no individual learned component beats every classical baseline.**
-
----
-
-# 21. Suggested workflow for any LLM picking up the repository
+# 19. Workflow for any LLM
 
 Before modifying code:
 
 1. Read this file.
-2. Read root `AGENTS.md`.
-3. Inspect `aegisswarm/splits.py` before touching any evaluation command.
-4. Identify the active branch and protocol.
-5. Inspect the most recent `artifacts/*/REPORT.md` if available locally.
-6. Determine whether the user is asking for:
-   - bug fixing;
-   - development experimentation;
-   - confirmation/final evidence;
-   - architecture design;
-   - submission/positioning.
-7. If confirmation is requested, verify architecture-freeze status first.
-8. If a result is pasted, classify it as training, quick/integration, development, or untouched confirmation before interpreting it.
-9. Preserve existing evidence; do not rewrite seed status to make results look stronger.
-10. Update this handoff when a major experiment completes or the active hypothesis changes.
-
-When modifying code:
-
-- prefer full, coherent implementation over scattered patches;
-- add regression tests for bugs that reached the user;
-- keep multiprocessing spawn-safe on macOS;
-- retain resumable artifacts for expensive search runs;
-- make protocol settings explicit in generated JSON/report files;
-- never silently change fitness/scenario semantics inside a running formal protocol.
+2. Read `docs/AEGISSWARM_STATUS.md` for the latest overlay.
+3. Read `AGENTS.md`.
+4. Inspect `aegisswarm/splits.py` before evaluation.
+5. Identify whether the task is bug fixing, development, confirmation, architecture design, or submission work.
+6. If a result is pasted, classify it as training, quick/integration, development, or untouched confirmation before interpreting it.
+7. Never consume confirmation without explicit freeze status.
+8. Update the handoff/status documents when a major experiment or architectural decision occurs.
 
 ---
 
-# 22. Repository / branch chronology
+# 20. Project separation
 
-Major research branches currently include:
-
-- `agent/structured-rule-program` — structured 12-rule programs, V1 formal proof machinery;
-- `agent/axplorer-v2` — fitness-conditioned/grammar-aware Axplorer V2;
-- `agent/hybrid-aegis` — fixed discovered strategy + optimized execution ablation;
-- `agent/hybrid-objective-learning` — **current active branch**, optimizer-aware strategy search.
-
-Current draft PR:
-
-- PR #2, `Train learned strategies through optimized execution`.
-
-The architecture remains explicitly **unfrozen**.
+AegisSwarm is separate from Ripple (airline disruption recovery) and separate from MISR/rectangle-integrality-gap research. Do not mix their deadlines, data, or claims unless explicitly asked.
 
 ---
 
-# 23. Project separation
+# 21. Current status in one paragraph
 
-Do not conflate AegisSwarm with other projects that may exist in the same user's work history.
-
-In particular:
-
-- **Ripple** is a separate airline disruption-recovery/optimization project.
-- MISR / rectangle-integrality-gap work is separate combinatorial-optimization research.
-
-AegisSwarm's current external submission target is iDEX/Open Challenge; aviation/OpenSky deadlines belong to Ripple/aviation research unless explicitly connected by the user.
-
----
-
-# 24. Current status in one paragraph
-
-As of **2026-08-17**, AegisSwarm has a functioning synthetic counter-swarm simulator, heuristic/optimization/RL baselines, a structured 12-rule policy language, local/evolutionary search, two generations of an Axplorer-style learned proposer, formal held-out statistics, stress testing, and hybrid optimizer execution. The strongest rigorous lesson so far is not that one framework universally wins: structured strategy search is strong, V1 Axplorer was statistically indistinguishable from local search on its untouched holdout, V2 showed only a small uncertain development gain, and simply swapping an optimizer under greedily trained strategies did not help. The project has therefore pivoted to **optimizer-aware objective learning**, where every candidate strategy is scored through the optimizer during training. A tiny quick run succeeded but is not evidence. The next meaningful result is the full 5-run, 1,800-evaluation-per-method development campaign on seeds **5000–5399**. Architecture is **not frozen**, and confirmation seeds **8000–8399 must remain untouched** until a deliberate freeze decision. The primary external target currently tracked is the iDEX Open Challenge deadline of **30 September 2026, 11:59 PM**, verified on the official site on 2026-08-17.
+As of **2026-08-17**, AegisSwarm has a functioning synthetic counter-swarm simulator, heuristic/optimization/RL baselines, a strong 60-token state-reactive strategy language, local/evolutionary search, two generations of an Axplorer-style proposer, formal held-out statistics, hybrid optimizer execution, and optimizer-aware strategy search. The strongest full-development result currently shows optimizer-aware local search at 80.5% survival and Axplorer at 81.0%, statistically tied, while the fixed hand-written optimizer objective is far weaker. This shifted attention from proposer choice to representation/planning. The first compact optimizer-native representation failed badly in quick mode because its zero-centred utility was not semantically comparable to the rule policy; it was invalidated before full development. The active protocol is now **optimizer-native V2**, which shares the rule-guided structural base utility and searches 14 smooth state modifiers. Development remains on `9000–9399`; confirmation `10000–10399` is untouched and must remain so until an explicit freeze decision. If V2 does not materially beat the 60-token representation, the next architecture should target the myopic one-step planning horizon rather than another proposer/representation iteration.
