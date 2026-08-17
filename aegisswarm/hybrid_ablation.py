@@ -10,14 +10,13 @@ import numpy as np
 
 from .final_proof import (
     METRICS,
-    evaluate_program_runs,
-    hierarchical_bootstrap_ci,
     paired_hierarchical_bootstrap,
     paired_sign_flip_pvalue,
     summarize_method,
 )
 from .hybrid import RuleGuidedHungarianPolicy
 from .optimization import HungarianPolicy
+from .rule_program import RuleProgramPolicy
 from .scenarios import ScenarioGenerator
 from .simulator import Simulator
 from .splits import HYBRID_DEV_SEEDS
@@ -51,6 +50,15 @@ def _evaluate_policy_on_seeds(policy_factory, seeds, scenario_kwargs):
     }
 
 
+def _greedy_worker(payload):
+    program, seeds, scenario_kwargs = payload
+    return _evaluate_policy_on_seeds(
+        lambda: RuleProgramPolicy(program),
+        seeds,
+        scenario_kwargs,
+    )
+
+
 def _hybrid_worker(payload):
     program, seeds, scenario_kwargs = payload
     return _evaluate_policy_on_seeds(
@@ -60,22 +68,7 @@ def _hybrid_worker(payload):
     )
 
 
-def evaluate_hybrid_program_runs(programs, seeds, scenario_kwargs=None, workers=1):
-    scenario_kwargs = dict(scenario_kwargs or SCENARIO_KWARGS)
-    payloads = [
-        ([int(x) for x in program], [int(s) for s in seeds], scenario_kwargs)
-        for program in programs
-    ]
-
-    if workers <= 1 or len(payloads) <= 1:
-        results = [_hybrid_worker(payload) for payload in payloads]
-    else:
-        with ProcessPoolExecutor(
-            max_workers=min(int(workers), len(payloads)),
-            mp_context=get_context("spawn"),
-        ) as executor:
-            results = list(executor.map(_hybrid_worker, payloads))
-
+def _pack_run_results(results):
     matrices = {
         metric: np.asarray(
             [[float(row[metric]) for row in result["rows"]] for result in results],
@@ -90,21 +83,46 @@ def evaluate_hybrid_program_runs(programs, seeds, scenario_kwargs=None, workers=
     }
 
 
+def _evaluate_program_runs(programs, seeds, scenario_kwargs, workers, worker_fn):
+    payloads = [
+        ([int(x) for x in program], [int(s) for s in seeds], dict(scenario_kwargs))
+        for program in programs
+    ]
+    if workers <= 1 or len(payloads) <= 1:
+        results = [worker_fn(payload) for payload in payloads]
+    else:
+        with ProcessPoolExecutor(
+            max_workers=min(int(workers), len(payloads)),
+            mp_context=get_context("spawn"),
+        ) as executor:
+            results = list(executor.map(worker_fn, payloads))
+    return _pack_run_results(results)
+
+
+def evaluate_greedy_program_runs(programs, seeds, scenario_kwargs=None, workers=1):
+    return _evaluate_program_runs(
+        programs,
+        seeds,
+        dict(scenario_kwargs or SCENARIO_KWARGS),
+        workers,
+        _greedy_worker,
+    )
+
+
+def evaluate_hybrid_program_runs(programs, seeds, scenario_kwargs=None, workers=1):
+    return _evaluate_program_runs(
+        programs,
+        seeds,
+        dict(scenario_kwargs or SCENARIO_KWARGS),
+        workers,
+        _hybrid_worker,
+    )
+
+
 def evaluate_optimizer_only(seeds, scenario_kwargs=None):
     scenario_kwargs = dict(scenario_kwargs or SCENARIO_KWARGS)
     result = _evaluate_policy_on_seeds(HungarianPolicy, seeds, scenario_kwargs)
-    matrices = {
-        metric: np.asarray(
-            [[float(row[metric]) for row in result["rows"]]],
-            dtype=float,
-        )
-        for metric in METRICS
-    }
-    return {
-        "matrices": matrices,
-        "runtime_by_run": [float(result["runtime_mean"])],
-        "raw_by_run": [result["rows"]],
-    }
+    return _pack_run_results([result])
 
 
 def _paired(first_eval, second_eval, first_name, second_name):
@@ -231,29 +249,17 @@ def run_hybrid_ablation(
     )
 
     optimizer_only = evaluate_optimizer_only(eval_seeds)
-    local_greedy = evaluate_program_runs(
-        local_programs,
-        eval_seeds,
-        SCENARIO_KWARGS,
-        workers=workers,
+    local_greedy = evaluate_greedy_program_runs(
+        local_programs, eval_seeds, SCENARIO_KWARGS, workers=workers
     )
     local_hybrid = evaluate_hybrid_program_runs(
-        local_programs,
-        eval_seeds,
-        SCENARIO_KWARGS,
-        workers=workers,
+        local_programs, eval_seeds, SCENARIO_KWARGS, workers=workers
     )
-    v2_greedy = evaluate_program_runs(
-        v2_programs,
-        eval_seeds,
-        SCENARIO_KWARGS,
-        workers=workers,
+    v2_greedy = evaluate_greedy_program_runs(
+        v2_programs, eval_seeds, SCENARIO_KWARGS, workers=workers
     )
     v2_hybrid = evaluate_hybrid_program_runs(
-        v2_programs,
-        eval_seeds,
-        SCENARIO_KWARGS,
-        workers=workers,
+        v2_programs, eval_seeds, SCENARIO_KWARGS, workers=workers
     )
 
     evaluations = {
