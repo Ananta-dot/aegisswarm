@@ -2,62 +2,81 @@
 
 **Status:** architecture development; not frozen  
 **Branch:** `agent/rolling-horizon-planning`  
-**Protocol:** `aegisswarm-rolling-horizon-screen-v1`
+**Active protocol:** `aegisswarm-rolling-horizon-screen-v2`
 
-## Why this experiment exists
+## Why this track exists
 
-The corrected optimizer-native V2 representation was materially worse than the incumbent 60-token state-reactive rule representation:
+The corrected optimizer-native V2 representation was materially worse than the incumbent 60-token state-reactive rule representation. The representation track is therefore closed and the incumbent strategy remains the 60-token rule program executed through optimization.
 
-```text
-rule_objective survival:       0.813
-native_objective_v2 survival:  0.701
-native - rule:                -0.1120
-95% CI:                        [-0.1405, -0.08249]
-p-value:                        0.000050
-```
+The next hypothesis is temporal: can short receding-horizon planning improve scarce-resource allocation relative to the current one-step Hungarian executor?
 
-The representation track is therefore closed. The next hypothesis is that the current one-step Hungarian executor is too myopic.
+## Planner V1 — completed fixed-program screen
 
-## Screening question
-
-Before paying for another 5 x 1,800 candidate training campaign, hold the five strong discovered rule programs fixed and compare only their execution:
+V1 held the five strong rule programs fixed and changed only execution:
 
 ```text
 same 60-token strategy + one-step Hungarian
-same 60-token strategy + short rolling-horizon planner
+same 60-token strategy + horizon-4 rolling planner
 ```
 
-This is a screen, not final evidence. A positive screen justifies planner-aware retraining; it does not establish the final architecture.
+Full development on consumed seeds `13000–13399`:
 
-## Planner
+```text
+fixed_optimizer survival: 0.310
+rule_one_step survival:   0.782 CI=[0.739, 0.81775]
+rule_rolling survival:    0.752 CI=[0.7125, 0.7900]
+rolling - one_step:      -0.0300 CI=[-0.07775, +0.01825625]
+scenario-level sign-flip p-value: 0.000700
+runtime one-step/rolling: 0.0125 s / 0.1837 s
+```
 
-`RuleGuidedRollingHorizonPolicy` reuses the exact rule-derived pair utility from `RuleGuidedHungarianPolicy`.
+V1 did **not** earn planner-aware retraining.
 
-At each simulator step it:
+The small p-value and hierarchical interval crossing zero summarize different uncertainty structures: the scenario-level sign-flip test averages over the five frozen programs first; the hierarchical interval resamples both programs and scenarios. Treat the hierarchical interval plus per-program effects as the primary architecture-level uncertainty summary.
 
-1. projects currently detected synthetic threats linearly for a short horizon;
-2. builds a time-indexed binary allocation problem;
-3. constrains each defender to at most one planned assignment per timestep;
-4. constrains cumulative planned uses by each defender's remaining abstract capacity;
-5. gives each threat at most one deterministic planned attempt over the short horizon;
-6. maximizes discounted rule-derived utility;
-7. executes only the first-step assignments;
-8. discards the rest of the plan and re-solves after the next observation.
+## V1 diagnosis — receding-horizon action deferral
 
-This is an abstract receding-horizon/MPC-style decision experiment, not real-world guidance or engagement engineering.
+V1 projected each detected threat forward and then re-evaluated the existing state-reactive rule utility on those projected states.
+
+That allowed a currently feasible threat to receive a larger h>0 score simply because it would be closer to its protected asset and might satisfy stronger urgency rules later. The MILP could schedule that action in the future. Because only h=0 is executed and the plan is recomputed on the next step, the action could repeatedly be pushed forward.
+
+This is a standard receding-horizon procrastination pathology.
+
+## Planner V2 — targeted correction
+
+V2 changes one semantic only.
+
+For each defender/threat pair:
+
+1. compute its current rule-derived pair utility;
+2. project the threat forward to determine future reachability and whether it is predicted to have reached its synthetic target;
+3. compute projected utility;
+4. if the pair is already feasible and strategically positive now, cap every future strategic value at the current value;
+5. apply temporal discounting;
+6. optimize the horizon allocation;
+7. execute h=0 only and replan after the next observation.
+
+Thus an already-feasible assignment cannot become more attractive merely by waiting. Future-only reachable opportunities are still represented normally.
+
+The planner remains abstract and synthetic. It does not add real-world platform guidance, interceptor physics, payloads, or engagement engineering.
 
 ## Evidence blocks
 
-- planning development: `13000–13399`
-- reserved planning confirmation: `14000–14399`
+Planner V1:
 
-Quick mode uses `13000–13019`; once inspected those are simply part of planning development.
+- development `13000–13399` — consumed;
+- old reserved confirmation `14000–14399` — untouched but tied to V1, do not repurpose silently.
 
-Do not inspect `14000–14399` during architecture iteration.
+Planner V2:
+
+- development `15000–15399`;
+- reserved confirmation `16000–16399`.
+
+Quick V2 uses `15000–15019` and is development-only.
 
 ## Incumbent strategy artifacts
 
-The screen loads the five rule programs trained during optimizer-native V2 development:
+V2 still holds fixed the five rule programs trained during optimizer-native V2 development:
 
 ```text
 artifacts/optimizer_native_v2_dev/runs/rule_objective_seed_44001.json
@@ -65,7 +84,7 @@ artifacts/optimizer_native_v2_dev/runs/rule_objective_seed_44001.json
 artifacts/optimizer_native_v2_dev/runs/rule_objective_seed_44005.json
 ```
 
-These are held fixed so the screen changes execution only.
+This means the V2 screen still isolates executor/planner semantics. It is **not** planner-aware strategy training.
 
 ## Commands
 
@@ -76,36 +95,32 @@ pytest -q
 python -m aegisswarm.rolling_horizon_cli --workers 5
 ```
 
-Expected header:
+Expected header and artifact:
 
 ```text
-AegisSwarm rolling-horizon screen
+AegisSwarm rolling-horizon V2 screen
+=== ROLLING-HORIZON V2 SCREEN ===
+Saved: artifacts/rolling_horizon_v2_quick
 ```
 
-Expected summary:
+V2 additionally prints the five per-program survival deltas.
 
-```text
-=== ROLLING-HORIZON SCREEN ===
-fixed_optimizer survival: ...
-rule_one_step survival:   ...
-rule_rolling survival:    ...
-difference (R-O):         ...
-paired p-value:           ...
-runtime one-step/rolling: ...
-```
-
-Do not run the full 400-scenario screen until quick output and runtime are inspected.
+Do not run the 400-scenario V2 screen until the fresh quick screen is interpreted.
 
 ## Decision gate
 
-### Promising
+### V2 materially positive / clearly no longer harmful
 
-If rolling horizon improves survival or produces a useful survival/resource tradeoff without pathological runtime, build a new planner-aware training protocol in which every candidate 60-token program is scored through the rolling-horizon executor.
+Run the full `15000–15399` development screen. Planner-aware 60-token training is considered only after that full result.
 
-### Rough tie
+### V2 rough tie
 
-A tie can still justify planner-aware training if the planning screen reveals better resource preservation/tail behavior, but do not assume it will improve after training.
+Inspect per-program deltas, penetrations, damage, resource use and runtime. A tie by itself does not justify an expensive planner-aware search campaign.
 
-### Clearly worse
+### V2 still materially worse
 
-Diagnose the planning formulation once. If the corrected planner remains materially worse, keep one-step rule-guided Hungarian as the executor and move to a different bottleneck such as simulator uncertainty/state estimation rather than endlessly increasing horizon complexity.
+Stop this rolling-horizon formulation. Retain the one-step `RuleGuidedHungarianPolicy` executor and move to another bottleneck rather than repeatedly increasing horizon/complexity.
+
+## Confirmation discipline
+
+Do not inspect `16000–16399` unless a later planner-aware architecture is explicitly frozen. A positive screening result alone is not sufficient to consume confirmation data.
