@@ -1,11 +1,11 @@
 # AegisSwarm — Current Research Status
 
 **Updated:** 2026-08-17  
-**Architecture status:** OBSERVABILITY-SAFE STRATEGY SELECTOR ACTIVE; NOT FROZEN FOR EXTERNAL CLAIMS  
-**Active branch:** `agent/strategy-selector`  
-**Active protocol:** `aegisswarm-observable-strategy-selector-v1`
+**Architecture status:** SELECTOR V1 FAILED; ORACLE DECOMPOSITION QUICK SHOWS NO STABLE SELECTION HEADROOM  
+**Active branch:** `agent/oracle-decomposition`  
+**Active protocol:** `aegisswarm-oracle-decomposition-v1`
 
-Read `docs/AEGISSWARM_SKILL.md` for long-form history, `STRATEGY_SELECTOR.md` for the active protocol, `EVIDENCE_HARDENING.md` for Simulator V2 headroom evidence, and the stochastic/reliability/planning docs for closed experiments.
+Read `docs/AEGISSWARM_SKILL.md` for long-form history, `ORACLE_DECOMPOSITION.md` for the active diagnostic, `STRATEGY_SELECTOR.md` for the closed selector experiment, `EVIDENCE_HARDENING.md` for Simulator V2 headroom evidence, and the reliability/stochastic/planning docs for prior closed experiments.
 
 ## Incumbent architecture
 
@@ -15,128 +15,95 @@ Read `docs/AEGISSWARM_SKILL.md` for long-form history, `STRATEGY_SELECTOR.md` fo
 + one-step RuleGuidedHungarianPolicy executor
 ```
 
-No tested proposer, compact representation, planner, reliability executor, or repeated-tape training protocol has robustly replaced this incumbent.
+No tested proposer, compact representation, planner, reliability executor, repeated-tape training protocol, or t=0 observable selector has robustly replaced this incumbent.
 
-## Why strategy selection is now the active hypothesis
+## Completed selector V1 — FAILED
 
-Simulator V2 headroom development on fresh `17000–17399` found:
-
-```text
-normal incumbent mean:          0.801
-perfect sensing:                0.801
-deterministic interactions:     0.999
-best-of-5 frozen oracle:        0.938
-frozen program survivals:       [0.7438, 0.8313, 0.8063, 0.8150, 0.8100]
-```
-
-The non-deployable oracle is therefore about `+10.7 pp` above the strongest individual frozen program on that block. This is evidence of scenario-specific strategy specialization, not evidence that a deployable selector already exists.
-
-Other attempted routes did not capture the large headroom:
-
-- reliability weighting: effectively null on `19000–19399`;
-- contingent backup: only `+1.55 pp`, CI crossing zero;
-- rolling-horizon V2: no useful gain and ~14x slower;
-- stochastic-robust V1 quick: negative co-adaptation result;
-- clean repeated-tape V2 quick: `-6.25 pp`, both paired runs negative.
-
-Do not run the closed V1/V2 stochastic full campaigns and do not inspect their reserved confirmation blocks.
-
-## Active experiment — observable strategy selector V1
-
-Question:
-
-> Can information available after the first sensing step but before the first assignment predict which of the five existing frozen 60-token strategies should be used for the episode?
-
-### Frozen policy set
-
-The same five incumbent programs from `artifacts/optimizer_native_v2_dev/runs` are used. They are not retrained or modified.
-
-### Selector features
-
-The selector snapshot is taken after `SimulatorV2.sense()` at `t=0` and before any assignment. Allowed features include:
-
-- counts/types of **detected** active threats;
-- detected-track speed, distance-to-target and time-to-target summaries;
-- reachability counts from known defenders to detected real threats;
-- known defender availability, remaining uses, capacity and range summaries;
-- known sensor detection/range summaries;
-- known asset value summary.
-
-Explicitly forbidden from selector features:
-
-- undetected threat position, type, velocity or target;
-- scenario seed;
-- future trajectory;
-- realized interaction outcomes;
-- oracle program choice or future episode metrics.
-
-Regression tests verify that changing an undetected threat's state leaves the selector feature vector unchanged.
-
-### Selector model
-
-V1 uses an intentionally simple fixed model:
+Full selector training used `27000–27399`; development evaluation used fresh `28000–28399`:
 
 ```text
-one ridge reward regressor per frozen program
-alpha = 1.0 (fixed, untuned)
+fixed best program index:         1
+fresh program survivals:          [0.7400, 0.8275, 0.81375, 0.81875, 0.8300]
+fixed best survival:              0.8275
+selector survival:                0.8113
+oracle survival:                  0.9338
+selector - fixed:                -0.0163 CI=[-0.0350,+0.0025]
+selector - fixed reward:         -2.960 CI=[-5.3340,-0.6094]
+oracle gap captured:             -0.153
+selector/oracle agreement:        0.310
 ```
 
-Training targets are the established scalar episode reward for each program on selector-training scenarios. At evaluation time, the selector chooses the program with highest predicted reward and commits to it for the episode.
+Decision:
 
-### Fair baseline
+- the t=0 observable ridge selector underperformed the training-selected fixed strategy;
+- the scalar-reward CI is entirely negative;
+- do **not** inspect `29000–29399` confirmation;
+- do not tune ridge alpha/features/model complexity on this development block by default.
 
-The primary baseline is **not the mean of five programs**. It is the best globally fixed frozen program selected by mean established scalar reward on the selector-training block.
+## Oracle decomposition quick — STRONG EVIDENCE AGAINST STABLE EPISODE-LEVEL SPECIALIZATION
 
-Fresh development reports:
-
-- best fixed survival;
-- learned selector survival;
-- non-deployable best-of-5 oracle survival;
-- paired scenario bootstrap CI for selector minus fixed;
-- selector minus fixed scalar reward;
-- fraction of fresh oracle survival gap captured;
-- selector/oracle choice frequencies and agreement (descriptive only).
-
-## Fresh selector blocks
-
-- `27000–27399`: selector training
-- `28000–28399`: selector development evaluation
-- `29000–29399`: reserved selector confirmation — **do not inspect**
-
-Quick V1 uses:
+Quick diagnostic used fresh structural worlds `30000–30019`, four independently keyed stochastic tapes per world, and the same five frozen incumbent programs.
 
 ```text
-training:   27000–27099 (100 scenarios)
-evaluation: 28000–28019 (20 scenarios)
+program mean survivals:          [0.7438, 0.8375, 0.8125, 0.7750, 0.8125]
+single-tape fixed survival:      0.925
+single-tape oracle survival:     0.975
+single-tape oracle - fixed:     +0.0500 CI=[0.0000,+0.1250]
+expected fixed survival:         0.8375
+expected oracle survival:        0.9000
+expected oracle - fixed:        +0.0625 CI=[+0.01875,+0.10625]
+cross-tape fixed survival:       0.8375
+cross-tape oracle survival:      0.8063
+cross-tape oracle - fixed:      -0.0312 CI=[-0.0875,+0.03125]
+cross-tape choice agreement:     0.450
+tape-oracle modal fraction:      0.575
+stable fraction of raw gap:     -0.625
 ```
 
-The full 400/400 development run is authorized only if quick evidence is promising.
+Interpretation:
 
-## Immediate runbook
+- same-tape hindsight remains optimistic;
+- averaging several tapes and choosing/scoring on those same tapes still produces an optimistic `+6.25 pp` gap;
+- the primary held-out-tape estimate is instead negative (`-3.12 pp`) and its CI spans zero;
+- only `45%` of per-world best-program choices agree between tape halves;
+- the typical tape-specific oracle choice is only modestly stable (`57.5%` modal fraction);
+- this quick evidence strongly suggests that much of the earlier `~93–94%` best-of-five oracle is realization-specific stochastic luck rather than stable structural specialization that an episode-level selector could learn.
+
+The negative stable-fraction statistic should not be interpreted literally as “negative headroom”; it means the held-out estimate reversed sign relative to the optimistic same-realization gap.
+
+## Why the full decomposition is still authorized
+
+Unlike a failed policy quick screen, this is an evidence diagnostic whose purpose is to decide whether strategy-selection headroom exists at all. Twenty worlds are too few to permanently close a research direction based on a held-out CI of `[-8.75,+3.125] pp`.
+
+Therefore the exact protocol is frozen and the full **development diagnostic** is authorized:
+
+```text
+400 structural worlds: 30000–30399
+8 independent indexed tapes/world
+5 frozen programs
+```
+
+Run:
 
 ```bash
-git fetch origin
-git checkout agent/strategy-selector
-git pull origin agent/strategy-selector
-pytest -q
-python -m aegisswarm.strategy_selector_cli --workers 14
+python -m aegisswarm.oracle_decomposition_cli --full --workers 14
 ```
 
-Do **not** use `--full` yet.
+Do not inspect the independent replication block `31000–31399`.
 
-## Decision gate
+## Full-development decision gate
 
-### Selector materially beats fixed best
+### Cross-tape gap remains near zero or negative
 
-Run the full `27000–27399` training / `28000–28399` development protocol. If the full result remains useful, freeze the selector model/features before any confirmation.
+Close episode-level frozen-program selection as a performance path. Stop using raw `93–94%` oracle survival as a realistic target. The incumbent remains a single robust fixed rule program/executor, and the next performance work should target **online state adaptation / uncertainty-aware sequential control or broader benchmark regimes**, not another static selector.
 
-### Selector approximately ties fixed best
+### Cross-tape gap becomes materially positive and choices stabilize
 
-The frozen-program oracle gap is largely not predictable from t=0 observable context using this simple static selector. Do not tune many classifier families immediately; first inspect whether oracle specialization is driven by later state or stochastic outcomes.
+There is genuine structural specialization hidden by the quick sample. Only then is a richer observable or later-state gating architecture justified.
 
-### Selector worsens
+### Same-tape/expected oracle remains large but cross-tape stays weak
 
-Close static t=0 strategy selection. The next scientifically justified options are later-state switching/contextual control or broader simulator/stress-regime generalization, not more frozen-program selector tuning by default.
+Treat the gap as stochastic hindsight. Do not tune selector model families against it.
 
 ## Evidence ledger
 
@@ -155,8 +122,10 @@ Consumed/inspected blocks include:
 - `19000–19399`: reliability-aware executor development
 - `21000–21003`, `22000–22019`: stochastic-robust V1 quick
 - `24000–24003`, `25000–25019`: stochastic-training V2 quick
+- `27000–27399`, `28000–28399`: observable selector V1 full development
+- `30000–30019`: oracle-decomposition quick structural worlds
 
-Reserved blocks tied to abandoned/unfrozen protocols must not be silently repurposed, including `18000–18399`, `20000–20399`, `23000–23399`, and `26000–26399`.
+Reserved blocks tied to abandoned/unfrozen protocols must not be repurposed, including `18000–18399`, `20000–20399`, `23000–23399`, `26000–26399`, and `29000–29399`. `31000–31399` is reserved independent oracle-decomposition replication and remains untouched.
 
 ## Claims policy
 
@@ -165,13 +134,15 @@ Supported development-level conclusions:
 - optimizer-aware 60-token rule search remains the strategic incumbent;
 - perfect-sensing headroom was essentially zero on `17000–17399`;
 - deterministic valid interactions showed large diagnostic headroom (`+19.8 pp`);
-- the five frozen strategies show substantial best-of-set scenario specialization;
-- reliability weighting did not help, backup was only weakly positive, rolling horizon did not help, and repeated-tape training failed its clean quick gate.
+- reliability weighting did not help, backup was only weakly positive, rolling horizon did not help, and repeated-tape training failed its clean quick gate;
+- the t=0 observable ridge selector underperformed the training-selected fixed strategy on full development;
+- the raw best-of-five oracle is a hindsight diagnostic and the quick cross-tape decomposition provides no evidence yet that its gap is stable across stochastic outcomes.
 
 Not supported:
 
-- strategy-selector superiority before this active experiment runs;
+- raw oracle performance as deployable or predictably attainable;
+- richer selector superiority;
+- stable structural specialization before the full oracle-decomposition diagnostic;
 - deterministic interaction success as attainable;
-- oracle performance as deployable;
 - superiority to optimization or RL generally;
 - real-world effectiveness or deployment readiness.
