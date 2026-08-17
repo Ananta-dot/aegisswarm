@@ -8,6 +8,7 @@ from aegisswarm.reliability import (
 )
 from aegisswarm.rule_program import PROGRAM_LENGTH
 from aegisswarm.scenarios import ScenarioGenerator
+from aegisswarm.simulator_v2 import SimulatorV2
 from aegisswarm.splits import (
     EVIDENCE_CONFIRM_SEEDS,
     EVIDENCE_DEV_SEEDS,
@@ -124,6 +125,25 @@ def test_backup_policy_can_allocate_exactly_one_contingent_backup():
     for did in chosen:
         defender = next(d for d in scenario.defenders if d.id == did)
         assert scenario.threats[0].distance_to(defender.x, defender.y) <= defender.range
+
+
+def test_contingent_backup_is_not_consumed_after_primary_success():
+    scenario = _single_threat_two_defender_scenario()
+    policy = ReliabilityAwareBackupPolicy(
+        _disabled_program(),
+        max_attempts_per_threat=2,
+        time_limit_seconds=1.0,
+    )
+    assignments = policy.assign(scenario, 0)
+    assert sum(tid == 0 for tid in assignments.values()) == 2
+
+    sim = SimulatorV2(scenario, deterministic_interactions=True)
+    result = sim.step(assignments)
+
+    # The primary resolves the threat; the contingent backup remains unused.
+    assert result.resources_used == 1
+    assert not scenario.threats[0].active
+    assert sum(d.remaining_uses for d in scenario.defenders) == 5
 
 
 def test_backup_policy_never_uses_defender_twice_or_more_than_two_per_threat():
