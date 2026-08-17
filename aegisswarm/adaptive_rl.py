@@ -44,35 +44,12 @@ QUICK_EVAL_COUNT = 20
 QUICK_CALIBRATION_COUNT = 100
 FULL_CALIBRATION_COUNT = 400
 
-# Normalize the already leakage-tested t=0 observable feature family to roughly
-# O(1) ranges. These are simulator-scale constants, not learned statistics.
 _BASE_FEATURE_SCALES = np.asarray(
     [
-        30.0,  # detected_total
-        30.0,  # detected_real
-        30.0,  # detected_direct
-        30.0,  # detected_fast
-        30.0,  # detected_decoy
-        150.0,  # mean_time_to_target
-        150.0,  # min_time_to_target
-        100.0,  # mean_target_distance
-        100.0,  # min_target_distance
-        2.0,  # mean_detected_speed
-        2.0,  # max_detected_speed
-        8.0,  # mean_reachable_defenders
-        1.0,  # fraction_zero_reach
-        1.0,  # fraction_one_reach
-        1.0,  # fraction_multi_reach
-        8.0,  # available_defenders
-        40.0,  # total_remaining_uses
-        5.0,  # mean_remaining_uses
-        5.0,  # min_remaining_uses
-        1.2,  # mean_defender_capacity
-        30.0,  # mean_defender_range
-        5.0,  # detected_real_per_available_defender
-        1.0,  # mean_sensor_detection_probability
-        55.0,  # mean_sensor_range
-        4.0,  # total_asset_value
+        30.0, 30.0, 30.0, 30.0, 30.0,
+        150.0, 150.0, 100.0, 100.0, 2.0, 2.0,
+        8.0, 1.0, 1.0, 1.0, 8.0, 40.0, 5.0, 5.0,
+        1.2, 30.0, 5.0, 1.0, 55.0, 4.0,
     ],
     dtype=float,
 )
@@ -98,16 +75,14 @@ OBS_DIM = len(OBS_FEATURE_NAMES)
 
 
 def _recent_failure_rate(history, window: int) -> float:
-    rows = list(history)[-int(window) :]
+    rows = list(history)[-int(window):]
     attempts = sum(int(a) for a, _ in rows)
     failures = sum(int(f) for _, f in rows)
     return float(failures / attempts) if attempts > 0 else 0.0
 
 
 def _current_overload_pressure(scenario) -> float:
-    defenders = [
-        d for d in scenario.defenders if d.available and d.remaining_uses > 0
-    ]
+    defenders = [d for d in scenario.defenders if d.available and d.remaining_uses > 0]
     if not defenders:
         return 1.0
     reachable_real = 0
@@ -157,17 +132,13 @@ class AdaptiveObjectiveHungarianPolicy(RuleGuidedHungarianPolicy):
 
         d_asset = distance_to_target(scenario, threat)
         urgency = float(np.clip(1.0 - d_asset / 40.0, 0.0, 1.0))
-
         urgency_gain = self.urgency_gain
         reliability_mix = self.reliability_mix
+
         if self.dynamic_context:
             urgency_gain += 2.0 * self.overload_pressure
             reliability_mix = float(
-                np.clip(
-                    reliability_mix + 0.55 * self.failure_pressure,
-                    0.0,
-                    0.85,
-                )
+                np.clip(reliability_mix + 0.55 * self.failure_pressure, 0.0, 0.85)
             )
 
         value += urgency_gain * urgency
@@ -245,6 +216,7 @@ class TacticalModeBank:
 
 
 def adaptive_observation(scenario, simulator: SimulatorV2, history, last_mode: int) -> np.ndarray:
+    """Build a leakage-safe observation from detected/known and realized state only."""
     base = observable_features(scenario)
     if base.shape != _BASE_FEATURE_SCALES.shape:
         raise RuntimeError("selector feature shape changed; update PPO normalization")
@@ -252,8 +224,10 @@ def adaptive_observation(scenario, simulator: SimulatorV2, history, last_mode: i
 
     diag = simulator.diagnostics()
     initial_uses = max(float(scenario.metadata.get("initial_defender_uses", 1.0)), 1.0)
-    real_total = max(
-        sum(int(th.threat_type != ThreatType.DECOY) for th in scenario.threats),
+    # The total scenario count is known from the scenario contract. Do not use the
+    # true real/decoy composition here because undetected threat type is hidden.
+    known_threat_total = max(
+        int(scenario.metadata.get("n_threats", len(scenario.threats))),
         1,
     )
     total_asset_value = max(float(sum(a.value for a in scenario.assets)), 1e-9)
@@ -264,7 +238,7 @@ def adaptive_observation(scenario, simulator: SimulatorV2, history, last_mode: i
         [
             float(simulator.t / max(scenario.max_steps, 1)),
             float(np.clip(simulator.cumulative_damage / total_asset_value, 0.0, 2.0)),
-            float(np.clip(simulator.total_penetrations / real_total, 0.0, 1.0)),
+            float(np.clip(simulator.total_penetrations / known_threat_total, 0.0, 1.0)),
             float(np.clip(simulator.total_resources_used / initial_uses, 0.0, 1.5)),
             float(failures / attempts) if attempts > 0 else 0.0,
             _recent_failure_rate(history, 1),
@@ -319,13 +293,9 @@ class AdaptiveEpisode:
 
         self.simulator.sense()
         self.simulator._update_overload_diagnostic()
-        self.initial_score = episode_reward(
-            self.simulator.metrics("ppo_partial").as_dict()
-        )
+        self.initial_score = episode_reward(self.simulator.metrics("ppo_partial").as_dict())
         self._previous_score = float(self.initial_score)
-        return adaptive_observation(
-            self.scenario, self.simulator, self.history, self.last_mode
-        )
+        return adaptive_observation(self.scenario, self.simulator, self.history, self.last_mode)
 
     def _termination_flags(self):
         real_active = any(
@@ -352,14 +322,16 @@ class AdaptiveEpisode:
         )
         step_result = self.simulator.step(assignments)
         after = self.simulator.diagnostics()
-        attempts_delta = int(after["real_interaction_attempts"] - before["real_interaction_attempts"])
-        failures_delta = int(after["real_interaction_failures"] - before["real_interaction_failures"])
+        attempts_delta = int(
+            after["real_interaction_attempts"] - before["real_interaction_attempts"]
+        )
+        failures_delta = int(
+            after["real_interaction_failures"] - before["real_interaction_failures"]
+        )
         self.history.append((attempts_delta, failures_delta))
         self.last_mode = int(mode)
 
-        current_score = episode_reward(
-            self.simulator.metrics("ppo_adaptive").as_dict()
-        )
+        current_score = episode_reward(self.simulator.metrics("ppo_adaptive").as_dict())
         reward = float((current_score - self._previous_score) / REWARD_SCALE)
         self._previous_score = float(current_score)
 
@@ -368,9 +340,7 @@ class AdaptiveEpisode:
             self.simulator.sense()
             self.simulator._update_overload_diagnostic()
 
-        obs = adaptive_observation(
-            self.scenario, self.simulator, self.history, self.last_mode
-        )
+        obs = adaptive_observation(self.scenario, self.simulator, self.history, self.last_mode)
         info = {
             "mode": int(mode),
             "mode_name": MODE_NAMES[int(mode)],
@@ -395,7 +365,7 @@ class AdaptiveEpisode:
 try:
     import gymnasium as gym
     from gymnasium import spaces
-except ImportError:  # pragma: no cover - exercised only without optional RL deps.
+except ImportError:  # pragma: no cover
     gym = None
     spaces = None
 
@@ -453,9 +423,7 @@ else:
 
     class AegisSwarmAdaptiveEnv:  # pragma: no cover
         def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "RL dependencies are not installed. Run: pip install -e '.[rl]'"
-            )
+            raise ImportError("RL dependencies are not installed. Run: pip install -e '.[rl]'")
 
 
 def run_static_mode(program, mode: int, scenario_seed: int):
@@ -514,7 +482,6 @@ def train_ppo_model(
                 train_seeds,
                 base_rng_seed=int(model_seed) * 100 + int(rank),
             )
-
         return _factory
 
     env_fns = [make_env(rank) for rank in range(n_envs)]
@@ -631,9 +598,7 @@ def run_ppo_adaptive_screen(
 
     model_seeds = QUICK_MODEL_SEEDS if quick else FULL_MODEL_SEEDS
     total_timesteps = QUICK_TIMESTEPS if quick else FULL_TIMESTEPS
-    eval_seeds = (
-        tuple(PPO_DEV_SEEDS[:QUICK_EVAL_COUNT]) if quick else tuple(PPO_DEV_SEEDS)
-    )
+    eval_seeds = tuple(PPO_DEV_SEEDS[:QUICK_EVAL_COUNT]) if quick else tuple(PPO_DEV_SEEDS)
     calibration_count = QUICK_CALIBRATION_COUNT if quick else FULL_CALIBRATION_COUNT
     calibration_seeds = tuple(PPO_TRAIN_SEEDS[:calibration_count])
     out_dir = Path(out_dir)
@@ -647,9 +612,7 @@ def run_ppo_adaptive_screen(
         flush=True,
     )
 
-    calibration_rows, calibration_rewards = evaluate_static_modes(
-        program, calibration_seeds
-    )
+    _, calibration_rewards = evaluate_static_modes(program, calibration_seeds)
     static_best_mode = int(np.argmax(np.asarray(calibration_rewards, dtype=float)))
 
     dev_static_rows, _ = evaluate_static_modes(program, eval_seeds)
@@ -658,7 +621,6 @@ def run_ppo_adaptive_screen(
 
     n_envs = max(1, min(int(workers), 12))
     ppo_rows_by_run = []
-    ppo_diag_by_run = []
     mode_counts_by_run = []
     model_paths = []
 
@@ -672,42 +634,25 @@ def run_ppo_adaptive_screen(
             n_envs=n_envs,
             model_path=model_path,
         )
-        rows, diagnostics, counts = evaluate_ppo_model(
-            program, model_path, eval_seeds
-        )
+        rows, _, counts = evaluate_ppo_model(program, model_path, eval_seeds)
         ppo_rows_by_run.append(rows)
-        ppo_diag_by_run.append(diagnostics)
         mode_counts_by_run.append({str(k): int(v) for k, v in sorted(counts.items())})
         model_paths.append(str(model_path) + ".zip")
 
     incumbent_survival = _metric_mean(incumbent_rows, "asset_survival_rate")
     static_best_survival = _metric_mean(static_best_rows, "asset_survival_rate")
     ppo_survival = float(
-        np.mean(
-            [
-                _metric_mean(rows, "asset_survival_rate")
-                for rows in ppo_rows_by_run
-            ]
-        )
+        np.mean([_metric_mean(rows, "asset_survival_rate") for rows in ppo_rows_by_run])
     )
 
     ppo_vs_inc = _hierarchical_delta(
-        incumbent_rows,
-        ppo_rows_by_run,
-        "asset_survival_rate",
-        seed=331001,
+        incumbent_rows, ppo_rows_by_run, "asset_survival_rate", seed=331001
     )
     ppo_vs_static = _hierarchical_delta(
-        static_best_rows,
-        ppo_rows_by_run,
-        "asset_survival_rate",
-        seed=331101,
+        static_best_rows, ppo_rows_by_run, "asset_survival_rate", seed=331101
     )
     static_vs_inc = _scenario_bootstrap_delta(
-        incumbent_rows,
-        static_best_rows,
-        "asset_survival_rate",
-        seed=331201,
+        incumbent_rows, static_best_rows, "asset_survival_rate", seed=331201
     )
 
     metric_summary = {}
@@ -796,8 +741,7 @@ def run_ppo_adaptive_screen(
     print(f"PPO per-run deltas:              {ppo_vs_inc['per_training_run']}", flush=True)
     print(f"PPO mode counts/run:             {mode_counts_by_run}", flush=True)
     print(
-        "metric means inc/static/PPO:       "
-        + json.dumps(metric_summary, sort_keys=True),
+        "metric means inc/static/PPO:       " + json.dumps(metric_summary, sort_keys=True),
         flush=True,
     )
     print(f"Saved: {out_dir}", flush=True)
