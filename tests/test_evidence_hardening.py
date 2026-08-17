@@ -76,24 +76,20 @@ def test_perfect_sensing_marks_all_active_threats_detected():
 
 def test_deterministic_interaction_succeeds_for_valid_reachable_pair():
     scenario = ScenarioGenerator().generate(seed=444)
-    for th in scenario.threats:
-        th.detected = True
+    defender = scenario.defenders[0]
+    threat = scenario.threats[0]
 
-    pair = None
-    for defender in scenario.defenders:
-        if defender.remaining_uses <= 0:
-            continue
-        for threat in scenario.threats:
-            if threat.distance_to(defender.x, defender.y) <= defender.range:
-                pair = (defender, threat)
-                break
-        if pair is not None:
-            break
+    # Scenario threats normally enter from the world boundary. Put one synthetic
+    # target inside the defender's abstract range so this unit test exercises a
+    # valid interaction deterministically rather than depending on random geometry.
+    threat.x = float(defender.x + min(1.0, 0.25 * defender.range))
+    threat.y = float(defender.y)
+    threat.vx = 0.0
+    threat.vy = 0.0
+    threat.detected = True
+    threat.first_detected_t = 0
 
-    assert pair is not None
-    defender, threat = pair
     was_real = threat.threat_type != ThreatType.DECOY
-
     sim = SimulatorV2(scenario, deterministic_interactions=True)
     before_uses = defender.remaining_uses
     sim.step({defender.id: threat.id})
