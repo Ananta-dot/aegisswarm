@@ -37,18 +37,26 @@ def test_stable_specialization_survives_cross_tape_holdout():
     assert result["cross_tape_oracle_minus_fixed"]["mean"] == 0.5
 
 
-def test_tape_specific_luck_does_not_create_cross_tape_advantage():
-    # First-half tapes favor program 0; second-half tapes favor program 1.
-    # A same-tape oracle looks strong, but the preference reverses out of sample.
+def test_tape_specific_luck_does_not_generalize_cross_tape():
+    # Tape 0 has a positive hindsight-oracle gap because different programs win
+    # different worlds. The second tape half reverses every per-world preference,
+    # so those same choices fail out of sample.
     survival = np.zeros((2, 3, 4), dtype=float)
-    survival[0, :, 0:2] = 1.0
-    survival[1, :, 2:4] = 1.0
+
+    # First half: program 0 wins worlds 0/2; program 1 wins world 1.
+    survival[0, [0, 2], 0:2] = 1.0
+    survival[1, 1, 0:2] = 1.0
+
+    # Second half reverses the winner for every world.
+    survival[1, [0, 2], 2:4] = 1.0
+    survival[0, 1, 2:4] = 1.0
 
     result = decompose_oracle(_metrics_from_survival(survival))
 
+    assert result["single_tape_oracle_minus_fixed"]["mean"] > 0.0
     assert result["cross_tape_choice_agreement"] == 0.0
     assert result["cross_tape_oracle_survival"] == 0.0
-    assert result["cross_tape_oracle_minus_fixed"]["mean"] == 0.0
+    assert result["cross_tape_oracle_minus_fixed"]["mean"] < 0.0
 
 
 def test_oracle_tape_seed_is_stable_and_replication_specific():
