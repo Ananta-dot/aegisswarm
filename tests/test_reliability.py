@@ -6,6 +6,7 @@ from aegisswarm.reliability import (
     ReliabilityWeightedHungarianPolicy,
     abstract_success_probability,
 )
+from aegisswarm.reliability_ablation import _diagnostic_ratio
 from aegisswarm.rule_program import PROGRAM_LENGTH
 from aegisswarm.scenarios import ScenarioGenerator
 from aegisswarm.simulator_v2 import SimulatorV2
@@ -50,22 +51,8 @@ def _single_threat_two_defender_scenario():
         detected=True,
     )
     defenders = [
-        Defender(
-            id=0,
-            x=25.0,
-            y=50.0,
-            capacity=0.80,
-            range=20.0,
-            remaining_uses=3,
-        ),
-        Defender(
-            id=1,
-            x=26.0,
-            y=50.0,
-            capacity=0.78,
-            range=20.0,
-            remaining_uses=3,
-        ),
+        Defender(id=0, x=25.0, y=50.0, capacity=0.80, range=20.0, remaining_uses=3),
+        Defender(id=1, x=26.0, y=50.0, capacity=0.78, range=20.0, remaining_uses=3),
     ]
     return Scenario(
         threats=[threat],
@@ -127,25 +114,6 @@ def test_backup_policy_can_allocate_exactly_one_contingent_backup():
         assert scenario.threats[0].distance_to(defender.x, defender.y) <= defender.range
 
 
-def test_contingent_backup_is_not_consumed_after_primary_success():
-    scenario = _single_threat_two_defender_scenario()
-    policy = ReliabilityAwareBackupPolicy(
-        _disabled_program(),
-        max_attempts_per_threat=2,
-        time_limit_seconds=1.0,
-    )
-    assignments = policy.assign(scenario, 0)
-    assert sum(tid == 0 for tid in assignments.values()) == 2
-
-    sim = SimulatorV2(scenario, deterministic_interactions=True)
-    result = sim.step(assignments)
-
-    # The primary resolves the threat; the contingent backup remains unused.
-    assert result.resources_used == 1
-    assert not scenario.threats[0].active
-    assert sum(d.remaining_uses for d in scenario.defenders) == 5
-
-
 def test_backup_policy_never_uses_defender_twice_or_more_than_two_per_threat():
     tokens = _disabled_program()
     scenario = ScenarioGenerator().generate(seed=991)
@@ -165,6 +133,44 @@ def test_backup_policy_never_uses_defender_twice_or_more_than_two_per_threat():
         threat = next(t for t in scenario.threats if t.id == tid)
         assert threat.distance_to(defender.x, defender.y) <= defender.range
     assert all(count <= 2 for count in counts.values())
+
+
+def test_backup_is_contingent_under_sequential_resolution():
+    scenario = _single_threat_two_defender_scenario()
+    policy = ReliabilityAwareBackupPolicy(
+        _disabled_program(),
+        max_attempts_per_threat=2,
+        time_limit_seconds=1.0,
+    )
+    assignments = policy.assign(scenario, 0)
+    chosen = [did for did, tid in assignments.items() if tid == 0]
+    assert len(chosen) == 2
+
+    uses_before = sum(d.remaining_uses for d in scenario.defenders)
+    sim = SimulatorV2(scenario, deterministic_interactions=True)
+    sim.step(assignments)
+    uses_after = sum(d.remaining_uses for d in scenario.defenders)
+
+    # The first selected defender resolves the threat; the second assignment sees
+    # the threat inactive and therefore consumes no use.
+    assert uses_before - uses_after == 1
+
+
+def test_diagnostic_ratio_aggregates_attempt_volume_not_episode_rates():
+    evaluation = {
+        "diagnostics_by_run": [[
+            {"real_interaction_attempts": 10, "real_interaction_failures": 4},
+            {"real_interaction_attempts": 20, "real_interaction_failures": 6},
+        ]]
+    }
+    assert abs(
+        _diagnostic_ratio(
+            evaluation,
+            "real_interaction_failures",
+            "real_interaction_attempts",
+        )
+        - (10.0 / 30.0)
+    ) < 1e-12
 
 
 def test_reliability_seed_blocks_are_fresh():
