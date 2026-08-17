@@ -10,13 +10,14 @@ import numpy as np
 
 from .final_proof import (
     METRICS,
+    evaluate_program_runs,
     paired_hierarchical_bootstrap,
     paired_sign_flip_pvalue,
     summarize_method,
 )
 from .hybrid import RuleGuidedHungarianPolicy
+from .hybrid_stats import paired_run_sign_flip_pvalue
 from .optimization import HungarianPolicy
-from .rule_program import RuleProgramPolicy
 from .scenarios import ScenarioGenerator
 from .simulator import Simulator
 from .splits import HYBRID_DEV_SEEDS
@@ -50,25 +51,34 @@ def _evaluate_policy_on_seeds(policy_factory, seeds, scenario_kwargs):
     }
 
 
-def _greedy_worker(payload):
-    program, seeds, scenario_kwargs = payload
-    return _evaluate_policy_on_seeds(
-        lambda: RuleProgramPolicy(program),
-        seeds,
-        scenario_kwargs,
-    )
+def _program_worker(payload):
+    mode, program, seeds, scenario_kwargs = payload
+    if mode == "hybrid":
+        factory = lambda: RuleGuidedHungarianPolicy(program)
+    elif mode == "greedy":
+        from .rule_program import RuleProgramPolicy
+        factory = lambda: RuleProgramPolicy(program)
+    else:
+        raise ValueError(f"unknown program worker mode: {mode}")
+    return _evaluate_policy_on_seeds(factory, seeds, scenario_kwargs)
 
 
-def _hybrid_worker(payload):
-    program, seeds, scenario_kwargs = payload
-    return _evaluate_policy_on_seeds(
-        lambda: RuleGuidedHungarianPolicy(program),
-        seeds,
-        scenario_kwargs,
-    )
+def _evaluate_programs(mode, programs, seeds, scenario_kwargs=None, workers=1):
+    scenario_kwargs = dict(scenario_kwargs or SCENARIO_KWARGS)
+    payloads = [
+        (mode, [int(x) for x in program], [int(s) for s in seeds], scenario_kwargs)
+        for program in programs
+    ]
 
+    if workers <= 1 or len(payloads) <= 1:
+        results = [_program_worker(payload) for payload in payloads]
+    else:
+        with ProcessPoolExecutor(
+            max_workers=min(int(workers), len(payloads)),
+            mp_context=get_context("spawn"),
+        ) as executor:
+            results = list(executor.map(_program_worker, payloads))
 
-def _pack_run_results(results):
     matrices = {
         metric: np.asarray(
             [[float(row[metric]) for row in result["rows"]] for result in results],
@@ -83,46 +93,29 @@ def _pack_run_results(results):
     }
 
 
-def _evaluate_program_runs(programs, seeds, scenario_kwargs, workers, worker_fn):
-    payloads = [
-        ([int(x) for x in program], [int(s) for s in seeds], dict(scenario_kwargs))
-        for program in programs
-    ]
-    if workers <= 1 or len(payloads) <= 1:
-        results = [worker_fn(payload) for payload in payloads]
-    else:
-        with ProcessPoolExecutor(
-            max_workers=min(int(workers), len(payloads)),
-            mp_context=get_context("spawn"),
-        ) as executor:
-            results = list(executor.map(worker_fn, payloads))
-    return _pack_run_results(results)
+def evaluate_hybrid_program_runs(programs, seeds, scenario_kwargs=None, workers=1):
+    return _evaluate_programs("hybrid", programs, seeds, scenario_kwargs, workers)
 
 
 def evaluate_greedy_program_runs(programs, seeds, scenario_kwargs=None, workers=1):
-    return _evaluate_program_runs(
-        programs,
-        seeds,
-        dict(scenario_kwargs or SCENARIO_KWARGS),
-        workers,
-        _greedy_worker,
-    )
-
-
-def evaluate_hybrid_program_runs(programs, seeds, scenario_kwargs=None, workers=1):
-    return _evaluate_program_runs(
-        programs,
-        seeds,
-        dict(scenario_kwargs or SCENARIO_KWARGS),
-        workers,
-        _hybrid_worker,
-    )
+    return _evaluate_programs("greedy", programs, seeds, scenario_kwargs, workers)
 
 
 def evaluate_optimizer_only(seeds, scenario_kwargs=None):
     scenario_kwargs = dict(scenario_kwargs or SCENARIO_KWARGS)
     result = _evaluate_policy_on_seeds(HungarianPolicy, seeds, scenario_kwargs)
-    return _pack_run_results([result])
+    matrices = {
+        metric: np.asarray(
+            [[float(row[metric]) for row in result["rows"]]],
+            dtype=float,
+        )
+        for metric in METRICS
+    }
+    return {
+        "matrices": matrices,
+        "runtime_by_run": [float(result["runtime_mean"])],
+        "raw_by_run": [result["rows"]],
+    }
 
 
 def _paired(first_eval, second_eval, first_name, second_name):
@@ -144,7 +137,10 @@ def _paired(first_eval, second_eval, first_name, second_name):
             "probability_second_better": float(stats["probability_axplorer_better"]),
             "paired_training_run_win_rate": float(stats["paired_training_run_win_rate"]),
             "paired_scenario_win_rate": float(stats["paired_scenario_win_rate"]),
-            "paired_sign_flip_pvalue": float(
+            "paired_run_exact_pvalue": float(
+                paired_run_sign_flip_pvalue(first, second)
+            ),
+            "scenario_level_sign_flip_pvalue": float(
                 paired_sign_flip_pvalue(first, second, seed=95000 + i)
             ),
         }
@@ -192,6 +188,11 @@ def _write_report(path, eval_seeds, run_seeds, summaries, comparisons):
         "The hybrid executor uses rule/model-derived utilities and reserve intent, then solves",
         "the immediate one-to-one assignment globally with a Hungarian optimizer.",
         "",
+        "Statistical interpretation: the paired hierarchical bootstrap CI is primary.",
+        "The exact paired-run permutation p-value treats independently trained policies as",
+        "the experimental unit. The scenario-level sign-flip value is retained only as a",
+        "secondary repeated-measures diagnostic.",
+        "",
         "## Survival",
         "",
         "| Variant | Survival | 95% CI |",
@@ -223,8 +224,9 @@ def _write_report(path, eval_seeds, run_seeds, summaries, comparisons):
             f"### {label}",
             "",
             f"- Difference: **{100.0 * s['second_minus_first']:+.2f} pp**",
-            f"- 95% paired CI: **[{100.0 * s['ci95'][0]:+.2f}, {100.0 * s['ci95'][1]:+.2f}] pp**",
-            f"- Paired sign-flip p-value: **{s['paired_sign_flip_pvalue']:.6f}**",
+            f"- 95% paired hierarchical bootstrap CI: **[{100.0 * s['ci95'][0]:+.2f}, {100.0 * s['ci95'][1]:+.2f}] pp**",
+            f"- Exact paired-run permutation p-value: **{s['paired_run_exact_pvalue']:.6f}**",
+            f"- Scenario-level sign-flip p-value (secondary): **{s['scenario_level_sign_flip_pvalue']:.6f}**",
             "",
         ]
 
@@ -250,16 +252,28 @@ def run_hybrid_ablation(
 
     optimizer_only = evaluate_optimizer_only(eval_seeds)
     local_greedy = evaluate_greedy_program_runs(
-        local_programs, eval_seeds, SCENARIO_KWARGS, workers=workers
+        local_programs,
+        eval_seeds,
+        SCENARIO_KWARGS,
+        workers=workers,
     )
     local_hybrid = evaluate_hybrid_program_runs(
-        local_programs, eval_seeds, SCENARIO_KWARGS, workers=workers
+        local_programs,
+        eval_seeds,
+        SCENARIO_KWARGS,
+        workers=workers,
     )
     v2_greedy = evaluate_greedy_program_runs(
-        v2_programs, eval_seeds, SCENARIO_KWARGS, workers=workers
+        v2_programs,
+        eval_seeds,
+        SCENARIO_KWARGS,
+        workers=workers,
     )
     v2_hybrid = evaluate_hybrid_program_runs(
-        v2_programs, eval_seeds, SCENARIO_KWARGS, workers=workers
+        v2_programs,
+        eval_seeds,
+        SCENARIO_KWARGS,
+        workers=workers,
     )
 
     evaluations = {
@@ -319,12 +333,14 @@ def run_hybrid_ablation(
     strat = comparisons["v2_under_hybrid"]["asset_survival_rate"]
     print(
         f"optimizer effect on V2: {opt['second_minus_first']:+.4f} "
-        f"CI={opt['ci95']} p={opt['paired_sign_flip_pvalue']:.6f}",
+        f"CI={opt['ci95']} run-p={opt['paired_run_exact_pvalue']:.6f} "
+        f"scenario-p={opt['scenario_level_sign_flip_pvalue']:.6f}",
         flush=True,
     )
     print(
         f"V2 strategy effect with optimizer: {strat['second_minus_first']:+.4f} "
-        f"CI={strat['ci95']} p={strat['paired_sign_flip_pvalue']:.6f}",
+        f"CI={strat['ci95']} run-p={strat['paired_run_exact_pvalue']:.6f} "
+        f"scenario-p={strat['scenario_level_sign_flip_pvalue']:.6f}",
         flush=True,
     )
     print(f"Saved: {out_dir}", flush=True)
