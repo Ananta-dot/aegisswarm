@@ -2,99 +2,104 @@
 
 This repository is an active research project. **The architecture is not frozen for external claims.**
 
-Before changing algorithms, experiments, seed splits, claims, or submission material, read in this order:
+Read in this order before changing algorithms or evidence protocols:
 
-1. [`docs/AEGISSWARM_SKILL.md`](docs/AEGISSWARM_SKILL.md) — canonical long-form history/methodology.
-2. [`docs/AEGISSWARM_STATUS.md`](docs/AEGISSWARM_STATUS.md) — latest-result/current-decision overlay; this supersedes older current-status wording.
-3. [`EVIDENCE_HARDENING.md`](EVIDENCE_HARDENING.md) — active simulator-v2/headroom protocol.
-4. [`ROLLING_HORIZON.md`](ROLLING_HORIZON.md) — completed planner V1/V2 history.
+1. `docs/AEGISSWARM_SKILL.md`
+2. `docs/AEGISSWARM_STATUS.md` — latest-state overlay
+3. `RELIABILITY_AWARE.md` — active protocol
+4. `EVIDENCE_HARDENING.md` — completed headroom protocol
+5. `ROLLING_HORIZON.md` — completed planner history
 
 ## Non-negotiable rules
 
 1. Never consume reserved confirmation seeds for development.
 2. Once inspected, a block is never untouched again.
 3. Do not silently change simulator/scoring/budgets inside an evidence protocol.
-4. Compare components by ablation, not ideology.
-5. Existing Hungarian and tabular-Q baselines are simple baselines, not representatives of optimization/RL generally.
-6. Keep implementation abstract, synthetic, defensive, and decision-support oriented.
-7. Record protocol IDs, seeds, budgets, source commit, artifacts, uncertainty, and architecture changes caused by inspected results.
-8. Keep handoff/status docs current after major experiments.
-9. Do not run a reserved confirmation merely because a development result is positive.
-10. Simulator-version results must remain labeled. Legacy `Simulator` and `SimulatorV2` are different protocol generations.
+4. Compare components by controlled ablation.
+5. Keep implementation abstract, synthetic, defensive, and decision-support oriented.
+6. Existing Hungarian and tabular-Q baselines are simple baselines, not representatives of optimization/RL generally.
+7. Legacy `Simulator` and `SimulatorV2` are different protocol generations; label them explicitly.
+8. Do not make real-world effectiveness or deployment claims from these synthetic experiments.
 
-## Current incumbent architecture
+## Incumbent before active reliability screen
 
 ```text
 60-token state-reactive rule representation
 + optimizer-aware local/evolutionary offline search
-+ one-step RuleGuidedHungarianPolicy execution
++ one-step RuleGuidedHungarianPolicy
 ```
 
-Do not reopen proposer/vector/planner tuning by default. The evidence to date is:
+Closed tracks:
 
-- hybrid-objective local `0.805`, Axplorer `0.810`, delta `+0.0055`, CI `[-0.0235,+0.0320]`;
-- optimizer-native V2 rules `0.813` vs native `0.701`, delta `-0.1120`, CI `[-0.1405,-0.08249]`;
-- rolling-horizon V2 one-step `0.808` vs rolling `0.801`, delta `-0.0065`, CI `[-0.0325,+0.01825]`, ~14x slower.
+- optimizer-native V2: materially worse; no V3; do not use `12000–12399` confirmation;
+- rolling-horizon V1/V2: no useful gain and much slower; no planner V3; do not use `16000–16399` confirmation.
 
-## Closed tracks
+## Completed evidence-hardening result
 
-- optimizer-native representation: closed; no V3; do not use `12000–12399` confirmation.
-- rolling-horizon V1/V2: closed; no planner-aware training or planner V3 by default; do not use `16000–16399` confirmation.
+Fresh Simulator V2 development `17000–17399`:
 
-## Active phase — evidence hardening / simulator headroom
+```text
+incumbent normal:              0.801
+perfect sensing:              0.801
+interaction deterministic:    0.999
+best-of-5 oracle:              0.938
+interaction headroom:        +0.1980 CI=[0.166,0.23625]
+sensing headroom:            -0.0005 CI=[-0.00225,0.0]
+```
 
-Branch: `agent/evidence-hardening`  
-Protocol: `aegisswarm-evidence-hardening-v1`
+Important diagnostics:
 
-The active code adds an **opt-in** `SimulatorV2` with indexed event randomness. Legacy `Simulator` remains untouched for reproducibility.
+```text
+real interaction failures mean:     15.661
+resource exhausted fraction:         0.8515
+penetrations undetected mean:        0.0
+decoy resource uses mean:            1.3665
+best-of-5 oracle gap:                +0.1362
+```
 
-New core files:
+Interpretation: sensing is not the immediate bottleneck. The dominant measured headroom is stochastic abstract interaction reliability under scarce capacity. Deterministic success is only a loose diagnostic relaxation, not an attainable-policy claim.
 
-- `aegisswarm/random_tape.py`
-- `aegisswarm/simulator_v2.py`
-- `aegisswarm/evidence_hardening.py`
-- `aegisswarm/evidence_hardening_cli.py`
-- `tests/test_evidence_hardening.py`
-- `EVIDENCE_HARDENING.md`
+`18000–18399` remains untouched and belongs to the completed evidence-hardening protocol. Do not repurpose it.
 
-Frozen incumbent programs are evaluated under:
+## Active experiment — reliability-aware assignment
 
-- normal Simulator V2;
-- perfect-sensing diagnostic;
-- deterministic-interaction diagnostic;
-- combined diagnostic;
-- best-of-5 per-scenario oracle;
-- fixed-optimizer V2 baseline;
-- descriptive legacy-Simulator reference.
+Branch: `agent/reliability-aware-assignment`  
+Protocol: `aegisswarm-reliability-aware-screen-v1`
 
-Diagnostic relaxations are not deployable assumptions or mathematical upper bounds. Best-of-5 is a non-deployable oracle.
+Question:
 
-## Active evidence blocks
+> Holding the same five 60-token programs fixed, can success-probability-aware allocation improve over the incumbent one-step Hungarian executor under SimulatorV2?
 
-- `17000–17399`: development
-- `18000–18399`: reserved evidence/confirmation — do not inspect
+Three variants:
 
-Quick mode consumes only `17000–17019` as development.
+1. incumbent `RuleGuidedHungarianPolicy`;
+2. `ReliabilityWeightedHungarianPolicy` — same one-to-one matching, score = strategic utility × abstract success probability;
+3. `ReliabilityAwareBackupPolicy` — set-packing executor with either one defender or an ordered primary+contingent-backup pair per threat, maximum two defenders per threat.
+
+No strategy retraining in the screen.
+
+Fresh reliability blocks:
+
+- `19000–19399`: development
+- `20000–20399`: reserved confirmation — **do not inspect**
+
+Quick mode uses `19000–19019`.
 
 ## Immediate runbook
 
 ```bash
-git checkout agent/evidence-hardening
-git pull origin agent/evidence-hardening
+git fetch origin
+git checkout agent/reliability-aware-assignment
+git pull origin agent/reliability-aware-assignment
 pytest -q
-python -m aegisswarm.evidence_hardening_cli --workers 14
+python -m aegisswarm.reliability_cli --workers 14
 ```
 
-Do not run `--full` until quick output is inspected. If quick is valid:
+Do not run `--full` until quick output is inspected.
 
-```bash
-python -m aegisswarm.evidence_hardening_cli --full --workers 14
-```
+## Decision gate
 
-## Decision after headroom measurement
-
-- large best-of-5 gap -> investigate strategy selector/meta-policy;
-- large sensing gap -> prioritize observation/state-estimation/sensor-allocation research;
-- large stochastic-interaction gap -> prioritize robustness/risk-aware objectives and stochastic replication;
-- large resource/overload residual -> sequential resource allocation/adaptive methods become better motivated;
-- small headroom -> stop chasing a higher score in this benchmark and move to richer scenarios, robustness, tail risk, stronger baselines, scaling, and external calibration.
+- weighted improves and backup does not -> keep one-to-one reliability weighting;
+- backup materially improves beyond weighted -> contingent backup is worth deeper evaluation;
+- both tie/worsen -> close this formulation and move to robust stochastic training/objectives rather than executor tuning;
+- strategy-selection work remains secondary and should use a separate fresh protocol if pursued.
