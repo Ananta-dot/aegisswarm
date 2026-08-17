@@ -1,15 +1,30 @@
 # AegisSwarm — Current Research Status
 
 **Updated:** 2026-08-17  
-**Architecture status:** NOT FROZEN  
+**Architecture status:** NOT FROZEN FOR EXTERNAL CLAIMS; CURRENT INCUMBENT SELECTED FOR EVIDENCE HARDENING  
 **Active branch:** `agent/rolling-horizon-planning`  
-**Active protocol:** `aegisswarm-rolling-horizon-screen-v2`
+**Completed protocol:** `aegisswarm-rolling-horizon-screen-v2`  
+**Current decision:** STOP EXECUTOR/REPRESENTATION ITERATION; HARDEN EVIDENCE AND MEASURE HEADROOM
 
-Read `docs/AEGISSWARM_SKILL.md` for full history. This file is the latest-state overlay.
+Read `docs/AEGISSWARM_SKILL.md` for full history. This file is the latest-state overlay and supersedes older current-status wording.
 
-## Incumbent architecture before planning
+## Incumbent architecture
 
-The optimizer-native representation track is closed. On fresh development seeds `11000–11399`:
+The strongest architecture currently justified by development evidence is:
+
+```text
+60-token state-reactive rule representation
+        +
+optimizer-aware local/evolutionary offline search
+        +
+one-step RuleGuidedHungarianPolicy executor
+```
+
+Axplorer remains an optional proposer but did not materially outperform local/evolutionary search. The compact optimizer-native representation was materially worse. Two rolling-horizon executor formulations did not improve the incumbent on full development screens.
+
+## Optimizer-native V2 — representation track closed
+
+Fresh development seeds `11000–11399`:
 
 ```text
 fixed_optimizer survival:      0.320
@@ -19,13 +34,11 @@ native - rule:                -0.1120 CI=[-0.1405, -0.08249375]
 paired p-value:                0.000050
 ```
 
-Decision: retain the 60-token state-reactive rule representation; no native V3; do not consume `12000–12399` confirmation.
+Decision: keep the 60-token rules; no optimizer-native V3; do not consume `12000–12399` confirmation.
 
-## Rolling-horizon planner V1 — completed and rejected
+## Rolling-horizon planner V1 — rejected
 
-V1 held five trained rule programs fixed and changed only execution to a horizon-4 receding-horizon MILP.
-
-Full development on consumed seeds `13000–13399`:
+Full fixed-program development screen on consumed seeds `13000–13399`:
 
 ```text
 fixed_optimizer survival: 0.310
@@ -36,71 +49,91 @@ scenario sign-flip p:     0.000700
 runtime one-step/rolling: 0.0125 s / 0.1837 s
 ```
 
-V1 did not earn planner-aware retraining. Inspection found a receding-horizon procrastination defect: projected future states could make an already-feasible threat more valuable later, encouraging the planner to schedule action at `h>0`, execute nothing now, then defer again after replanning.
+Inspection found a concrete receding-horizon procrastination defect: projected future urgency could make an already-feasible action more valuable later, encouraging repeated deferral.
 
-## Planner V2 — targeted correction
+## Rolling-horizon planner V2 — full screen completed, planning track closed
 
-V2 changes one semantic only:
+V2 fixed only the diagnosed deferral incentive by capping the future strategic value of an already-feasible pair at its current value before discounting. It was evaluated on fresh development seeds `15000–15399`.
 
-- projection still determines future reachability and predicted target arrival;
-- if a defender/threat pair is already positive and feasible now, its future strategic value is capped at its current value;
-- temporal discounting is then applied;
-- future-only reachable pairs can still enter the horizon normally.
-
-This removes the diagnosed incentive to wait merely because urgency grows.
-
-## Planner V2 quick screen — PASSED DEVELOPMENT GATE
-
-Fresh quick-development subset `15000–15019`, five frozen incumbent rule programs, horizon 4:
+Full result:
 
 ```text
-fixed_optimizer survival: 0.250
-rule_one_step survival:   0.805 CI=[0.715, 0.890]
-rule_rolling_v2 survival: 0.840 CI=[0.740, 0.920125]
-rolling - one_step:      +0.0350 CI=[-0.025, +0.105]
-per-program deltas:       [0.000, 0.000, +0.100, +0.050, +0.025]
-scenario sign-flip p:     0.149193
-runtime one-step/rolling: 0.0130 s / 0.1846 s
+fixed_optimizer survival: 0.329
+rule_one_step survival:   0.808 CI=[0.776, 0.83575]
+rule_rolling_v2 survival: 0.801 CI=[0.76174375, 0.837]
+rolling - one_step:      -0.0065 CI=[-0.0325, +0.01825]
+per-program deltas:       [-0.025, -0.03625, +0.0225, -0.0075, +0.01375]
+scenario sign-flip p:     0.333083
+runtime one-step/rolling: 0.0128 s / 0.1774 s
 ```
 
 ### Interpretation
 
-1. This 20-scenario result is a development screen, not superiority evidence.
-2. V2 has removed the pathological negative behavior seen in planner V1.
-3. The point estimate is +3.5 percentage points, but the hierarchical 95% interval still crosses zero substantially.
-4. Per-program effects are non-negative across all five frozen strategies: two ties and three positive effects. That is encouraging for an executor-level screen because the gain is not produced by one strategy being rescued while others degrade.
-5. Runtime remains about 14–15x one-step execution, but absolute mean runtime remains below 0.2 s/scenario in the current synthetic setup.
-6. Planner V2 therefore **passes the quick development gate** and warrants the full fresh `15000–15399` screen.
+1. Corrected rolling-horizon execution is statistically consistent with a small loss/tie, not a useful positive gain.
+2. The point estimate is `-0.65` percentage points and the primary hierarchical interval crosses zero.
+3. Program-level effects are mixed: three of five incumbent programs became worse and two became better.
+4. Rolling-horizon execution is roughly 14x slower per scenario than the incumbent one-step executor.
+5. This does **not** justify planner-aware 1,800-candidate training.
+6. Do not build planner V3 by default and do not consume `16000–16399` confirmation.
+7. Retain one-step `RuleGuidedHungarianPolicy` as the executor incumbent.
 
-## Active next experiment
+## What the repeated ~80–81% plateau means now
 
-Run the full fixed-program Planner V2 screen on all development seeds `15000–15399`.
+The project has tested proposer choice, strategic representation, executor swapping, optimizer-aware objective training, and two rolling-horizon formulations. Strong variants repeatedly remain around the low-80% survival region on their respective development blocks.
 
-```bash
-python -m aegisswarm.rolling_horizon_cli --full --workers 14
-```
+It is now inefficient to keep assuming another architecture tweak will break the plateau.
 
-This still does **not** retrain rules through the planner.
+The next question should be:
 
-The full-screen decision must use:
+> **How much achievable headroom actually exists in the current simulator, and how robust is the incumbent advantage when exogenous randomness is coupled consistently across policies?**
 
-- rolling minus one-step mean survival;
-- hierarchical 95% CI as the primary architecture-level uncertainty summary;
-- five per-program survival deltas;
-- penetrations, damage, resource consumption and response delay where available;
-- runtime.
+## Next protocol — evidence hardening / headroom measurement
 
-### Decision gate after full V2 screen
+Do not change the incumbent policy architecture initially.
 
-**Useful positive effect:** if the full screen shows a meaningful gain with broadly non-negative per-program behavior and acceptable secondary/runtime tradeoffs, build exactly one planner-aware rule-training protocol under a matched simulator-evaluation budget.
+### 1. Policy-independent stochastic evaluation
 
-**Tie:** inspect secondary metrics and per-program effects. A tie alone does not automatically justify training.
+Build a simulator/evaluation V2 with indexed random draws so shared exogenous events are independent of policy call order. At minimum, random draws should be reproducibly indexed by scenario seed plus event identity for:
 
-**Materially worse:** stop this rolling-horizon formulation. Keep one-step `RuleGuidedHungarianPolicy`; do not create planner V3 by default.
+- detection events;
+- threat motion noise;
+- abstract interaction outcomes.
 
-## Evidence ledger
+The goal is stronger common-random-number coupling for paired comparisons, not to make the simulator easier or harder.
 
-Consumed development/evidence:
+This is a new simulator/evidence version. Old results remain valid for their old simulator version but should not be mixed numerically with V2 evidence without labeling the environment change.
+
+### 2. Measure environment headroom
+
+Before inventing another learner, quantify where survival is lost using clearly labeled relaxation diagnostics, for example:
+
+- incumbent under ordinary sensing/stochastic interaction;
+- perfect-sensing diagnostic;
+- deterministic-interaction-success diagnostic;
+- perfect-sensing + deterministic-success loose upper-envelope diagnostic;
+- best-of-incumbent-programs per scenario under a fixed random tape as a policy-class headroom diagnostic.
+
+These are diagnostics/upper envelopes, not deployable policies and not claims of operational performance.
+
+### 3. Align statistical estimands
+
+Primary architecture claims should report:
+
+- mean effect;
+- hierarchical interval across independent training/search runs and scenarios;
+- per-training-run effects;
+- scenario-conditional effects separately when useful;
+- runtime and secondary metrics.
+
+With only five independently trained programs, training-run uncertainty is a real limitation. For a final evidence package, consider increasing independent training seeds rather than treating thousands of scenarios as thousands of independent learned policies.
+
+### 4. Only then choose the next algorithmic investment
+
+If the headroom diagnostic is large, target the identified source of loss (e.g. sensing/uncertainty, robustness/generalization, sequential adaptation). If headroom is small, stop optimizing the same simulator and shift effort to richer scenario families, robustness, tail risk, scaling, and stronger external baselines.
+
+## Seed/evidence ledger
+
+Consumed development/evidence blocks include:
 
 - `2000–2099`: structured development-test;
 - `2100–2499`: V1 formal holdout;
@@ -110,40 +143,36 @@ Consumed development/evidence:
 - `9000–9399`: optimizer-native V1 development;
 - `11000–11399`: optimizer-native V2 development;
 - `13000–13399`: rolling-horizon planner V1 development;
-- `15000–15019`: inspected planner V2 quick subset (part of V2 development).
+- `15000–15399`: rolling-horizon planner V2 development.
 
-Untouched reserved blocks tied to older abandoned/unfrozen protocols:
+Untouched reserved blocks tied to older unfrozen/abandoned protocols must not be silently repurposed as confirmation:
 
 - `6000–6399`;
 - `7000–7399`;
 - `8000–8399`;
 - `10000–10399`;
 - `12000–12399`;
-- `14000–14399`.
+- `14000–14399`;
+- `16000–16399` — planner V2 confirmation; **do not run**.
 
-Active Planner V2:
+A new simulator/evidence-hardening protocol should receive fresh development and reserved evidence blocks.
 
-- `15000–15399`: development;
-- `16000–16399`: reserved confirmation — **do not inspect**.
+## Supported development-level conclusions
 
-## Claims policy
-
-Supported development-level conclusions:
-
-- optimizer-aware searched rule strategies substantially improve the current fixed hand-written myopic optimizer baseline in this synthetic simulator;
-- Axplorer did not materially outperform local/evolutionary search under the matched hybrid-objective protocol;
+- optimizer-aware searched 60-token rule strategies substantially outperform the current fixed hand-written myopic objective in this synthetic simulator;
+- Axplorer did not materially outperform conventional local/evolutionary search under the matched hybrid-objective protocol;
 - optimizer-native V2 was 11.2 percentage points worse than the 60-token rule representation on fresh development data;
-- the 60-token rule representation remains the strategic incumbent;
-- rolling-horizon planner V1 did not improve the incumbent frozen strategies and exposed a concrete action-deferral defect;
-- corrected planner V2 passed a 20-scenario development gate with a +3.5 pp point estimate and non-negative effects across all five frozen strategies, but its CI crosses zero and it is not yet evidence of superiority.
+- rolling-horizon V1 was worse and exposed a concrete action-deferral flaw;
+- corrected rolling-horizon V2 was effectively tied/slightly worse than one-step execution and about 14x slower, so planner-aware retraining is not justified;
+- the 60-token state-reactive rules + optimizer-aware local search + one-step Hungarian executor remain the incumbent architecture.
 
 Not supported:
 
-- that rolling-horizon planning is superior;
-- that the planning horizon is definitively the bottleneck;
+- that ~81% is the true attainable simulator ceiling;
 - superiority to optimization generally;
 - superiority to state-of-the-art RL/MARL;
-- real-world effectiveness or deployment readiness.
+- real-world counter-swarm effectiveness;
+- deployment readiness.
 
 ## External target
 
