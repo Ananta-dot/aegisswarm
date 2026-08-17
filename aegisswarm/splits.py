@@ -10,21 +10,25 @@ TEST_SEEDS = DEV_TEST_SEEDS  # backward-compatible name used by existing CLIs
 # must never be reused as unseen evidence for algorithm changes.
 FINAL_HOLDOUT_SEEDS = tuple(range(2100, 2500))
 
-# Axplorer V2 architecture-development block. It is intentionally separate from
-# every V1 evaluation block. Results here may guide V2 development.
+# Axplorer V2 architecture-development block.
 V2_DEV_SEEDS = tuple(range(3000, 3400))
 
-# Hybrid-architecture development block. This is separate from V2 development so
-# executor/optimizer changes can be diagnosed without reusing the V2 dev set.
-HYBRID_DEV_SEEDS = tuple(range(4000, 4400))
-
-# Reserved V2 confirmation block. Do not inspect or evaluate these seeds until
-# the V2 architecture and hyperparameters have been frozen after development.
+# Reserved V2 confirmation block. Do not inspect until V2 is frozen.
 V2_CONFIRM_SEEDS = tuple(range(6000, 6400))
 
-# Reserved confirmation block for the eventual hybrid architecture. Do not use
-# this block during hybrid architecture or hyperparameter development.
+# Hybrid execution-ablation development block.
+HYBRID_DEV_SEEDS = tuple(range(4000, 4400))
+
+# Reserved hybrid execution confirmation block.
 HYBRID_CONFIRM_SEEDS = tuple(range(7000, 7400))
+
+# Hybrid objective-learning development block. Here every searched candidate is
+# executed through the optimizer during training.
+HYBRID_OBJECTIVE_DEV_SEEDS = tuple(range(5000, 5400))
+
+# Reserved confirmation for the optimizer-aware learned-objective architecture.
+# Do not inspect until the architecture/hyperparameters are explicitly frozen.
+HYBRID_OBJECTIVE_CONFIRM_SEEDS = tuple(range(8000, 8400))
 
 SPLITS = {
     "train": TRAIN_SEEDS,
