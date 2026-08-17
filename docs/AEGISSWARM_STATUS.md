@@ -1,11 +1,11 @@
 # AegisSwarm — Current Research Status
 
 **Updated:** 2026-08-17  
-**Architecture status:** STOCHASTIC-TRAINING V2 QUICK FAILED; STRATEGY SELECTION IS NEXT  
-**Active branch:** `agent/stochastic-training-ablation`  
-**Completed quick protocol:** `aegisswarm-stochastic-training-ablation-v2`
+**Architecture status:** OBSERVABILITY-SAFE STRATEGY SELECTOR ACTIVE; NOT FROZEN FOR EXTERNAL CLAIMS  
+**Active branch:** `agent/strategy-selector`  
+**Active protocol:** `aegisswarm-observable-strategy-selector-v1`
 
-Read `docs/AEGISSWARM_SKILL.md` for long-form history, `EVIDENCE_HARDENING.md` for Simulator V2 headroom evidence, `RELIABILITY_AWARE.md` for the reliability-executor screen, `STOCHASTIC_ROBUST.md` for robust-training V1, and `STOCHASTIC_TRAINING_ABLATION.md` for V2.
+Read `docs/AEGISSWARM_SKILL.md` for long-form history, `STRATEGY_SELECTOR.md` for the active protocol, `EVIDENCE_HARDENING.md` for Simulator V2 headroom evidence, and the stochastic/reliability/planning docs for closed experiments.
 
 ## Incumbent architecture
 
@@ -17,98 +17,126 @@ Read `docs/AEGISSWARM_SKILL.md` for long-form history, `EVIDENCE_HARDENING.md` f
 
 No tested proposer, compact representation, planner, reliability executor, or repeated-tape training protocol has robustly replaced this incumbent.
 
-## Completed evidence that determines the next step
+## Why strategy selection is now the active hypothesis
 
-### Simulator V2 headroom — `17000–17399`
-
-```text
-normal incumbent:              0.801
-perfect sensing:               0.801
-deterministic interactions:    0.999
-interaction headroom:         +0.1980 CI=[+0.166,+0.23625]
-best-of-5 oracle:              0.938
-```
-
-The deterministic-success relaxation is a loose counterfactual diagnostic, not an attainable-policy claim. The best-of-5 oracle is also non-deployable; it is evidence that the frozen strategies specialize across scenarios.
-
-On the same evidence block, frozen-program survival rates were approximately:
+Simulator V2 headroom development on fresh `17000–17399` found:
 
 ```text
-[0.7438, 0.8313, 0.8063, 0.8150, 0.8100]
+normal incumbent mean:          0.801
+perfect sensing:                0.801
+deterministic interactions:     0.999
+best-of-5 frozen oracle:        0.938
+frozen program survivals:       [0.7438, 0.8313, 0.8063, 0.8150, 0.8100]
 ```
 
-So the oracle `0.938` is about `+10.7 pp` above the strongest fixed frozen program on that block, not merely above the mean program performance.
+The non-deployable oracle is therefore about `+10.7 pp` above the strongest individual frozen program on that block. This is evidence of scenario-specific strategy specialization, not evidence that a deployable selector already exists.
 
-### Reliability-aware executor screen — `19000–19399`
+Other attempted routes did not capture the large headroom:
+
+- reliability weighting: effectively null on `19000–19399`;
+- contingent backup: only `+1.55 pp`, CI crossing zero;
+- rolling-horizon V2: no useful gain and ~14x slower;
+- stochastic-robust V1 quick: negative co-adaptation result;
+- clean repeated-tape V2 quick: `-6.25 pp`, both paired runs negative.
+
+Do not run the closed V1/V2 stochastic full campaigns and do not inspect their reserved confirmation blocks.
+
+## Active experiment — observable strategy selector V1
+
+Question:
+
+> Can information available after the first sensing step but before the first assignment predict which of the five existing frozen 60-token strategies should be used for the episode?
+
+### Frozen policy set
+
+The same five incumbent programs from `artifacts/optimizer_native_v2_dev/runs` are used. They are not retrained or modified.
+
+### Selector features
+
+The selector snapshot is taken after `SimulatorV2.sense()` at `t=0` and before any assignment. Allowed features include:
+
+- counts/types of **detected** active threats;
+- detected-track speed, distance-to-target and time-to-target summaries;
+- reachability counts from known defenders to detected real threats;
+- known defender availability, remaining uses, capacity and range summaries;
+- known sensor detection/range summaries;
+- known asset value summary.
+
+Explicitly forbidden from selector features:
+
+- undetected threat position, type, velocity or target;
+- scenario seed;
+- future trajectory;
+- realized interaction outcomes;
+- oracle program choice or future episode metrics.
+
+Regression tests verify that changing an undetected threat's state leaves the selector feature vector unchanged.
+
+### Selector model
+
+V1 uses an intentionally simple fixed model:
 
 ```text
-incumbent:                    0.809
-reliability weighted:         0.810
-contingent backup:            0.825
-weighted-incumbent:          +0.0003 CI=[-0.0165,+0.01775]
-backup-incumbent:            +0.0155 CI=[-0.00625,+0.03575625]
+one ridge reward regressor per frozen program
+alpha = 1.0 (fixed, untuned)
 ```
 
-Decision: weighting-only is null; backup is a weak positive but did not earn confirmation. Do not inspect `20000–20399`.
+Training targets are the established scalar episode reward for each program on selector-training scenarios. At evaluation time, the selector chooses the program with highest predicted reward and commits to it for the episode.
 
-### Stochastic-robust V1 quick — CLOSED
+### Fair baseline
 
-V1 mixed repeated stochastic candidate evaluation with backup-executor co-adaptation. Quick result on inspected `22000–22019`:
+The primary baseline is **not the mean of five programs**. It is the best globally fixed frozen program selected by mean established scalar reward on the selector-training block.
+
+Fresh development reports:
+
+- best fixed survival;
+- learned selector survival;
+- non-deployable best-of-5 oracle survival;
+- paired scenario bootstrap CI for selector minus fixed;
+- selector minus fixed scalar reward;
+- fraction of fresh oracle survival gap captured;
+- selector/oracle choice frequencies and agreement (descriptive only).
+
+## Fresh selector blocks
+
+- `27000–27399`: selector training
+- `28000–28399`: selector development evaluation
+- `29000–29399`: reserved selector confirmation — **do not inspect**
+
+Quick V1 uses:
 
 ```text
-robust inc/inc:          0.713
-robust backup/backup:    0.625
-co-adapted delta:       -0.0875 CI=[-0.225,+0.05]
-per-run deltas:         [-0.05,-0.125]
+training:   27000–27099 (100 scenarios)
+evaluation: 28000–28019 (20 scenarios)
 ```
 
-Do not run full V1 and do not inspect `23000–23399`.
+The full 400/400 development run is authorized only if quick evidence is promising.
 
-### Stochastic-training V2 quick — CLOSED
+## Immediate runbook
 
-V2 cleanly isolated repeated stochastic candidate evaluation under the same incumbent executor. Quick result on fresh `25000–25019`:
-
-```text
-frozen reference:               0.795
-single-tape training:           0.787
-repeated-tape training:         0.725
-repeated - single:             -0.0625 CI=[-0.200,+0.050]
-per-run deltas:                 [-0.100,-0.025]
-training rollouts/candidate:    4 / 8
-runtime single/repeated:        0.0171s / 0.0166s
+```bash
+git fetch origin
+git checkout agent/strategy-selector
+git pull origin agent/strategy-selector
+pytest -q
+python -m aegisswarm.strategy_selector_cli --workers 14
 ```
 
-Decision:
+Do **not** use `--full` yet.
 
-- repeated-tape candidate evaluation fails the quick gate;
-- both paired search-run effects are negative;
-- do **not** run V2 `--full`;
-- do **not** inspect `26000–26399` confirmation;
-- stop repeated-tape training as the next performance direction by default.
+## Decision gate
 
-The frozen reference is descriptive only and is not used to infer the repeated-tape effect.
+### Selector materially beats fixed best
 
-## Next experiment — observability-safe strategy selection
+Run the full `27000–27399` training / `28000–28399` development protocol. If the full result remains useful, freeze the selector model/features before any confirmation.
 
-The strongest remaining empirical signal is frozen-strategy specialization. The earlier best-of-5 oracle reached `0.938`, while the strongest individual frozen program on that block was about `0.831`.
+### Selector approximately ties fixed best
 
-Next question:
+The frozen-program oracle gap is largely not predictable from t=0 observable context using this simple static selector. Do not tune many classifier families immediately; first inspect whether oracle specialization is driven by later state or stochastic outcomes.
 
-> Can a selector using only information observable before the first action choose among the five existing frozen 60-token programs better than committing to one globally fixed program?
+### Selector worsens
 
-The first selector experiment should be deliberately simple and interpretable:
-
-- keep all five frozen programs unchanged;
-- use Simulator V2 indexed randomness;
-- take a feature snapshot after the simulator's first sensing step and before the first assignment;
-- features may use only detected active threats plus known assets, defenders, sensors and resource state;
-- never use undetected threat type/position, future trajectories, realized interaction outcomes, or oracle labels at evaluation time;
-- fit one fixed ridge reward model per program from development-training scenarios;
-- choose the program with highest predicted established scalar reward;
-- compare against the **best fixed program selected on selector-training data**, not against the mean of five programs;
-- report the non-deployable oracle on fresh development only as remaining headroom.
-
-Use new blocks because this architecture is motivated by inspected oracle results and failed stochastic-training experiments.
+Close static t=0 strategy selection. The next scientifically justified options are later-state switching/contextual control or broader simulator/stress-regime generalization, not more frozen-program selector tuning by default.
 
 ## Evidence ledger
 
@@ -125,31 +153,25 @@ Consumed/inspected blocks include:
 - `15000–15399`: rolling-horizon V2 development
 - `17000–17399`: evidence-hardening/headroom development
 - `19000–19399`: reliability-aware executor development
-- `21000–21003`: stochastic-robust V1 quick training worlds inspected
-- `22000–22019`: stochastic-robust V1 quick evaluation inspected
-- `24000–24003`: stochastic-training V2 quick training worlds inspected
-- `25000–25019`: stochastic-training V2 quick evaluation inspected
+- `21000–21003`, `22000–22019`: stochastic-robust V1 quick
+- `24000–24003`, `25000–25019`: stochastic-training V2 quick
 
-Reserved blocks tied to abandoned/unfrozen protocols must not be repurposed silently, including `18000–18399`, `20000–20399`, `23000–23399`, and `26000–26399`.
+Reserved blocks tied to abandoned/unfrozen protocols must not be silently repurposed, including `18000–18399`, `20000–20399`, `23000–23399`, and `26000–26399`.
 
 ## Claims policy
 
 Supported development-level conclusions:
 
 - optimizer-aware 60-token rule search remains the strategic incumbent;
-- optimizer-native V2 was materially worse;
-- corrected rolling-horizon execution did not improve the incumbent;
 - perfect-sensing headroom was essentially zero on `17000–17399`;
-- deterministic valid interactions showed large diagnostic headroom (`+19.8` pp, CI entirely positive);
-- the five frozen strategies exhibit substantial best-of-set scenario specialization;
-- reliability-weighted Hungarian did not improve full-screen survival;
-- contingent backup produced only a small uncertain positive point estimate;
-- repeated-tape stochastic candidate evaluation failed its clean V2 quick gate.
+- deterministic valid interactions showed large diagnostic headroom (`+19.8 pp`);
+- the five frozen strategies show substantial best-of-set scenario specialization;
+- reliability weighting did not help, backup was only weakly positive, rolling horizon did not help, and repeated-tape training failed its clean quick gate.
 
 Not supported:
 
-- strategy-selector superiority before the next experiment;
+- strategy-selector superiority before this active experiment runs;
 - deterministic interaction success as attainable;
-- contingent-backup executor superiority;
+- oracle performance as deployable;
 - superiority to optimization or RL generally;
 - real-world effectiveness or deployment readiness.
