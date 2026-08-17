@@ -2,42 +2,27 @@
 
 **Updated:** 2026-08-17  
 **Architecture status:** NOT FROZEN  
-**Active branch:** `agent/optimizer-native-objective`  
-**Active protocol:** `aegisswarm-optimizer-native-objective-v2`
+**Current completed protocol:** `aegisswarm-optimizer-native-objective-v2`  
+**Current decision:** CLOSE REPRESENTATION TRACK; MOVE TO ROLLING-HORIZON PLANNING
 
 This is the current-state overlay for `docs/AEGISSWARM_SKILL.md`. Read the long-form skill for project history and this file for the latest experiment/decision.
 
-## Strongest completed full-development result before the active representation track
+## Strong incumbent before the representation experiment
 
-Hybrid-objective protocol `aegisswarm-hybrid-objective-v1`, consumed development seeds `5000–5399`:
+The completed optimizer-aware hybrid-objective development protocol on seeds `5000–5399` produced:
 
 ```text
 fixed_optimizer survival: 0.320
-hybrid_local survival:    0.805 CI=[0.77624375, 0.83100625]
-hybrid_axplorer survival: 0.810 CI=[0.77775, 0.841]
-Axplorer - local:         +0.0055 CI=[-0.0235, +0.0320]
-paired p-value:           0.507075
+hybrid_local survival:    0.805
+hybrid_axplorer survival:  0.810
+Axplorer - local:         +0.0055 CI=[-0.0235, +0.0320], p=0.507075
 ```
 
-Decision:
+Interpretation: searching a strategic objective for the optimizer is valuable, but Axplorer did not add a material advantage over local/evolutionary search. The 60-token state-reactive rule representation plus optimizer-aware local/evolutionary search became the incumbent architecture for further ablation.
 
-- optimizer-aware objective search is highly valuable relative to the current fixed hand-written objective;
-- Axplorer does not demonstrate a material increment over optimizer-aware local/evolutionary search;
-- proposer choice is deprioritized;
-- architecture remains unfrozen;
-- do not run the old `8000–8399` hybrid-objective confirmation block.
+## Optimizer-native V1 — rejected
 
-## Current bottleneck hypothesis
-
-Several serious architectures have repeatedly clustered around roughly 80–81% survival on their respective development/formal blocks. These are different seed blocks, so do not compare them as a single leaderboard, but the repeated plateau motivates:
-
-> **The strategic representation and/or the myopic one-step assignment layer is now a more plausible bottleneck than proposer choice.**
-
-## Optimizer-native V1 — FULL DEVELOPMENT COMPLETED, THEN INVALIDATED
-
-The original 10-parameter optimizer-native representation used a zero-centred utility instead of inheriting the rule-guided policy's positive structural base utility. It also omitted useful state-reactive signals.
-
-Quick mode first showed a pathological gap. Before the V2 patch was pulled locally, the full V1 campaign also completed on seeds `9000–9399`:
+V1 was a 10-parameter continuous objective. Full development on consumed seeds `9000–9399` produced:
 
 ```text
 fixed_optimizer survival: 0.310
@@ -47,140 +32,130 @@ native - rule:           -0.4280 CI=[-0.4845, -0.3590]
 paired p-value:            0.000050
 ```
 
-The final V1 training log also showed one native run reaching about `0.812` survival on its 16 training scenarios while the five-run development evaluation averaged only `0.359`, indicating severe generalization failure in addition to the representation defect.
+V1 also showed severe train/development generalization failure and had a semantic design defect: its zero-centred utility could reject reachable assignments that the rule-guided comparator gave positive structural utility. V1 is permanently rejected and `9000–9399` is consumed development data.
 
-### Correct interpretation
+## Optimizer-native V2 — full development completed, representation hypothesis rejected
 
-This is a valid **negative result for optimizer-native V1**, but not evidence that optimizer-native strategic objectives are intrinsically inferior.
+V2 corrected the semantic defect, inherited the same structural base utility as `RuleGuidedHungarianPolicy`, and searched 14 smooth state modifiers. It used fresh development seeds `11000–11399`.
 
-V1 is invalidated as the candidate architecture because:
-
-1. its utility semantics were not comparable to the rule-guided comparator;
-2. it could reject reachable threats as non-positive/no-op candidates before learning meaningful rankings;
-3. it omitted target-damage and richer reserve/release state signals;
-4. it generalized very poorly from the small training bundle to the 400-scenario development block.
-
-Do not rerun or tune V1. Do not use `9000–9399` as fresh evidence again.
-
-## Active experiment — optimizer-native V2
-
-Protocol: `aegisswarm-optimizer-native-objective-v2`
-
-V2 keeps the representation hypothesis but fixes the semantics. It shares the exact structural base used by `RuleGuidedHungarianPolicy`:
+Full development result:
 
 ```text
-2 * abstract threat-type prior
-+ inverse target-asset distance term
-+ inverse defender/threat distance term
+fixed_optimizer survival:      0.320
+rule_objective survival:       0.813 CI=[0.78149375, 0.841]
+native_objective_v2 survival:  0.701 CI=[0.66275, 0.7355]
+native - rule:                -0.1120 CI=[-0.1405, -0.08249375]
+paired p-value:                0.000050
 ```
 
-Search then learns 14 smooth state modifiers covering:
+### Interpretation
 
-- urgency;
-- protected-asset value;
-- threat-class modifiers;
-- defender/threat closeness;
-- defender capacity;
-- resource scarcity;
-- reserve threshold;
-- urgency threshold that releases reserve;
-- assignment persistence;
-- speed;
-- target-asset damage state;
-- urgency × scarcity interaction.
+1. The semantically corrected continuous optimizer-native representation is **materially worse** than the existing 60-token state-reactive rule representation under the matched protocol.
+2. The effect is large: **-11.2 percentage points** asset survival, with the entire paired hierarchical 95% interval below zero.
+3. This is not a reason for a V3 vector. The representation track has now received a fair corrected test and lost decisively.
+4. Keep the 60-token rule representation as the incumbent strategic representation.
+5. Do **not** run optimizer-native V2 confirmation on `12000–12399`; the candidate architecture did not earn a freeze.
+6. Do not repurpose older reserved confirmation blocks as fresh development evidence.
 
-The optimizer still owns feasible one-to-one assignment and no-op choices.
+## Current architectural conclusion
 
-Both V2 native and the 60-token rule comparator start from stochastic candidates and use the same local/evolutionary search family, matched seeds, simulator, fitness, Hungarian executor, and candidate-evaluation budget.
+The project has now tested multiple proposer and representation variants while strong rule-based optimizer-aware systems repeatedly remain around the low-80% survival region on their respective development/formal blocks.
 
-### Fresh V2 evidence blocks
+The evidence now points more strongly to the **one-step/myopic planning horizon** as the next bottleneck.
 
-Because the entire V1 development block was inspected and directly informed V2 design, V2 has fresh blocks:
+The next research question is:
 
-- `11000–11399`: **V2 development**;
-- `12000–12399`: **V2 reserved confirmation**.
+> **Holding the winning 60-token state-reactive rule objective fixed, can a short rolling-horizon planner that allocates scarce resources across several future abstract timesteps outperform the same rule objective executed by per-step Hungarian matching?**
 
-`10000–10399` remains untouched but belongs to the abandoned V1 evidence plan. Do not silently repurpose it as V2 confirmation.
+This is a planning ablation, not another representation or proposer experiment.
 
-V2 uses separate artifact paths:
+## Incumbent components for the next protocol
+
+Keep fixed initially:
+
+- synthetic simulator semantics;
+- scalar fitness;
+- 12-rule / 60-token strategic representation;
+- optimizer-aware local/evolutionary search as the offline strategy learner;
+- same scenario generation and metrics;
+- same abstract defensive/simulation-only scope.
+
+Change only:
+
+- executor/planning horizon: one-step Hungarian assignment -> short rolling-horizon time-indexed planner.
+
+The first planning experiment should compare:
 
 ```text
-artifacts/optimizer_native_v2_quick/
-artifacts/optimizer_native_v2_dev/
-artifacts/optimizer_native_v2_confirm/
+fixed one-step Hungarian baseline
+searched 60-token rules + one-step Hungarian
+searched 60-token rules + rolling-horizon planner
 ```
 
-## Immediate runbook
+For the primary causal comparison, retrain the same 60-token representation through each executor under matched search seeds/budgets rather than swapping an executor under an old policy artifact.
 
-First pull the V2 code. The expected logs must say `optimizer-native-v2`, `native-v2-local`, and `OPTIMIZER-NATIVE OBJECTIVE V2`.
+## Planning implementation direction
 
-```bash
-git checkout agent/optimizer-native-objective
-git pull origin agent/optimizer-native-objective
-pytest -q
-python -m aegisswarm.optimizer_native_cli --quick --workers 4
-```
+Prefer a small time-indexed optimization problem rather than another scoring heuristic. With current dependencies (`scipy>=1.11`), a short-horizon MILP/linear optimization formulation is available without adding a new solver dependency.
 
-Do **not** launch full development if the output still says `native-local` or saves to `artifacts/optimizer_native_quick`; that means the checkout is stale.
+At an abstract level, the planner may optimize assignments across a horizon such as 3–5 synthetic timesteps with constraints on:
 
-If quick V2 is no longer pathologically worse, then run:
+- at most one assignment per defender per planning step;
+- at most one planned assignment per threat per step;
+- cumulative defender-use/resource limits;
+- predicted reachability from current synthetic state;
+- no-op options;
+- reserve/resource opportunity cost.
 
-```bash
-python -m aegisswarm.optimizer_native_cli --workers 6
-```
+Only the first-step assignment is executed; the problem is re-solved after the next observation, i.e. receding-horizon/MPC-style control.
 
-Do not run `--confirm` until the full V2 development result is interpreted and an explicit freeze decision is recorded.
+Keep prediction and utility abstract. Do not add real platform guidance, interceptor physics, or engagement engineering.
 
-## Decision tree
+## Seed/evidence ledger
 
-### V2 materially beats the 60-token rules
-
-Inspect secondary metrics, run stability, runtime, and the primary estimand. Freeze only if the gain is operationally meaningful and robust; then consider `12000–12399` confirmation once.
-
-### V2 ties the rule representation near the plateau
-
-Stop representation tuning. Move to a new protocol for a short rolling-horizon/MPC-style abstract planner.
-
-### V2 remains materially worse
-
-Keep the 60-token representation and move to planning. Do not keep adding vector parameters merely to force a representation win.
-
-## Seed ledger update
-
-Consumed:
+Consumed development/evidence blocks:
 
 - `2000–2099`: structured development-test;
 - `2100–2499`: V1 formal holdout;
 - `3000–3399`: Axplorer V2 development;
 - `4000–4399`: hybrid-executor development;
 - `5000–5399`: hybrid-objective development;
-- `9000–9399`: optimizer-native V1 development, fully consumed and invalidated as an architecture.
+- `9000–9399`: optimizer-native V1 development;
+- `11000–11399`: optimizer-native V2 development.
 
-Untouched older reserved blocks:
+Untouched reserved blocks that belong to older abandoned/unfrozen protocols:
 
 - `6000–6399`: Axplorer V2 confirmation;
 - `7000–7399`: executor-swap confirmation;
 - `8000–8399`: hybrid-objective confirmation;
-- `10000–10399`: old V1-native reserved confirmation; do not repurpose silently.
+- `10000–10399`: old native-V1 confirmation;
+- `12000–12399`: native-V2 confirmation — **do not run**.
 
-Active V2:
-
-- `11000–11399`: development;
-- `12000–12399`: reserved confirmation.
+The new rolling-horizon protocol must receive a **fresh development block and a fresh reserved confirmation block**.
 
 ## Claims policy
 
-Supported development-level statement:
+Supported development-level conclusions:
 
-> In the current synthetic simulator, optimizer-aware search of a strategic objective substantially improves the current myopic fixed-objective Hungarian baseline. Axplorer and local/evolutionary search were statistically indistinguishable under the completed hybrid-objective protocol. A first compact optimizer-native V1 representation generalized very poorly and was rejected; a semantically corrected V2 representation is now being evaluated on fresh development data.
+- optimizer-aware search of a strategic objective substantially improves the current fixed hand-written myopic optimizer baseline in this synthetic simulator;
+- Axplorer and conventional local/evolutionary search were statistically indistinguishable under the matched hybrid-objective protocol;
+- optimizer-native V1 failed badly and had a representation defect;
+- the corrected optimizer-native V2 representation was still materially worse than the 60-token rule representation by 11.2 percentage points on its fresh 400-scenario development block;
+- the 60-token state-reactive rule representation remains the strongest strategic representation tested so far.
 
 Not supported:
 
-- Axplorer superiority;
 - superiority to optimization generally;
 - superiority to state-of-the-art RL/MARL;
 - real-world counter-swarm effectiveness;
-- deployment readiness.
+- deployment readiness;
+- a claim that the planning horizon is already proven to be the bottleneck; it is the next hypothesis to test.
+
+## Immediate decision
+
+**NO OPTIMIZER-NATIVE CONFIRMATION. NO V3 VECTOR.**
+
+Start a new rolling-horizon planning protocol with the 60-token rules as incumbent and fresh evidence blocks.
 
 ## External target
 
