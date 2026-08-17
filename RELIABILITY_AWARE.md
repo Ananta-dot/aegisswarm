@@ -1,12 +1,12 @@
 # AegisSwarm Reliability-Aware Assignment Screen
 
-**Status:** architecture development; not frozen  
+**Status:** full development complete; not frozen  
 **Branch:** `agent/reliability-aware-assignment`  
 **Protocol:** `aegisswarm-reliability-aware-screen-v1`
 
-## Why this experiment exists
+## Motivation
 
-Evidence-hardening development on fresh Simulator V2 seeds `17000–17399` showed:
+Simulator V2 headroom development on fresh seeds `17000–17399` showed:
 
 ```text
 incumbent normal survival:             0.801
@@ -16,117 +16,77 @@ interaction headroom:                 +0.1980 CI=[0.166, 0.23625]
 best-of-5 oracle survival:             0.938
 ```
 
-Normal episodes averaged `15.661` failed real interaction attempts and were resource-exhausted in `85.15%` of program-scenario episodes. Undetected penetrations were zero and decoy resource use was small relative to total attempts.
-
-This does **not** imply deterministic success is attainable. It motivates testing whether allocation that explicitly accounts for abstract success probability can use scarce resources more effectively.
+This motivated testing whether explicit abstract success-probability awareness could use scarce resources more effectively. The deterministic-success result is only a loose counterfactual diagnostic.
 
 ## Frozen strategic layer
 
-The same five previously discovered 60-token rule programs remain fixed. No candidate search or retraining occurs in this screen.
+The same five previously discovered 60-token rule programs were held fixed. No search or retraining occurred.
 
-## Three executor variants
+## Variants
 
-### 1. Incumbent
+1. **Incumbent** — `RuleGuidedHungarianPolicy`.
+2. **ReliabilityWeightedHungarianPolicy`** — same one-to-one assignment semantics, but positive strategic utility is multiplied by Simulator V2 abstract success probability.
+3. **ReliabilityAwareBackupPolicy`** — one-step set-packing MILP may assign an ordered primary+backup pair to a threat. The backup consumes a use only if the primary does not already resolve the threat under existing Simulator V2 sequential resolution semantics.
 
-`RuleGuidedHungarianPolicy`
-
-- rule-derived strategic pair utility;
-- one defender per threat;
-- one threat per defender;
-- no explicit success-probability factor in the assignment objective.
-
-### 2. Reliability-weighted Hungarian
-
-`ReliabilityWeightedHungarianPolicy`
-
-Preserves the incumbent one-to-one assignment semantics but multiplies each positive strategic utility by Simulator V2's abstract success probability.
-
-This isolates the effect of choosing more reliable feasible pairings without introducing redundancy.
-
-### 3. Reliability-aware contingent backup
-
-`ReliabilityAwareBackupPolicy`
-
-At each step the policy constructs mutually exclusive action groups:
-
-- one defender assigned to one threat; or
-- an ordered pair of defenders assigned to one threat, with the second acting as a contingent backup under existing Simulator V2 sequential resolution semantics.
-
-For a single defender:
-
-```text
-expected score = u1 * p1
-```
-
-For an ordered primary/backup pair:
+For a primary/backup pair:
 
 ```text
 expected score = u1*p1 + (1-p1)*u2*p2
 ```
 
-where `u` is the incumbent rule-derived strategic utility and `p` is the abstract Simulator V2 success probability.
+## Fresh development result
 
-A small binary set-packing MILP chooses groups subject to:
+Full development block `19000–19399`, five frozen programs:
 
-- each defender appears in at most one selected group;
-- each threat receives at most one selected group;
-- maximum two defenders per threat;
-- no future-horizon planning.
+```text
+incumbent survival:               0.809
+reliability-weighted survival:    0.810
+contingent-backup survival:       0.825
+weighted - incumbent:            +0.0003 CI=[-0.0165, +0.01775]
+backup - incumbent:              +0.0155 CI=[-0.00625, +0.03575625]
+backup - weighted:               +0.0152 CI=[-0.00825, +0.0375]
+per-program weighted deltas:      [+0.0050, -0.0125, +0.00125, +0.00875, -0.00125]
+per-program backup deltas:        [-0.0025, +0.0250, +0.0200, +0.02875, +0.00625]
+resources consumed inc/wgt/bak:   31.492 / 31.494 / 31.547
+real interaction failures:        15.422 / 15.460 / 15.908
+runtime inc/wgt/bak:              0.0218s / 0.0219s / 0.0450s
+```
 
-The backup is not an extra guaranteed interaction: it remains subject to the same stochastic Simulator V2 outcome if the primary fails.
+## Interpretation
+
+### Reliability weighting
+
+Rejected as a useful executor change. The full-screen improvement is only `+0.03` percentage points and the interval is centered on zero.
+
+### Contingent backup
+
+A weak positive development signal only:
+
+- `+1.55` pp mean survival vs incumbent;
+- four of five per-program effects positive, one slightly negative;
+- hierarchical CI crosses zero;
+- actual abstract resource consumption is nearly unchanged;
+- runtime roughly doubles, although absolute runtime remains small.
+
+Raw interaction-failure counts are not failure rates because backup changes attempt volume. The result does not establish that backup reduces interaction failure probability; it only shows a small survival point estimate under the tested execution semantics.
+
+## Decision
+
+- Do not consume `20000–20399` confirmation.
+- Do not declare backup the incumbent.
+- Do not continue weighting/backup executor micro-tuning by default.
+- The simple executor variants capture only a small fraction of the large stochastic-interaction headroom.
+- Move to stochastic-robust training: evaluate each candidate across multiple policy-independent Simulator V2 random tapes per scenario under common random numbers.
+
+The first robust-training version should keep the existing scalar fitness averaged over repeated tapes; do not add a CVaR/risk-weight hyperparameter yet. Compare robust training through the incumbent executor against robust training through contingent backup under the same candidate/tape budget.
 
 ## Evidence hygiene
 
-Because this executor was designed after inspecting evidence-hardening development, it receives fresh blocks:
+Consumed:
 
-- `19000–19399`: reliability-aware development
-- `20000–20399`: reserved reliability-aware confirmation
+- `19000–19399`: reliability-aware development.
 
-Do not inspect `20000–20399` during architecture development.
+Untouched:
 
-Do not repurpose `18000–18399`; it remains untouched and belongs to the completed evidence-hardening protocol.
-
-## Runbook
-
-```bash
-git fetch origin
-git checkout agent/reliability-aware-assignment
-git pull origin agent/reliability-aware-assignment
-pytest -q
-python -m aegisswarm.reliability_cli --workers 14
-```
-
-Expected quick markers:
-
-```text
-AegisSwarm reliability-aware screen
-=== RELIABILITY-AWARE ASSIGNMENT SCREEN ===
-incumbent survival: ...
-reliability-weighted survival: ...
-contingent-backup survival: ...
-weighted - incumbent: ...
-backup - incumbent: ...
-backup - weighted: ...
-```
-
-Do not run `--full` until the 20-scenario quick output is inspected.
-
-## Decision gate
-
-### Weighted improves, backup does not
-
-Success-probability-aware pair selection is useful; retain one-to-one assignment and avoid extra backup complexity.
-
-### Backup improves materially beyond weighted
-
-Contingent redundancy is useful under scarce stochastic resources. Inspect resource consumption, interaction failures, per-program stability, and runtime before any strategy retraining.
-
-### Both tie
-
-The large deterministic-interaction headroom cannot be captured by this simple expected-value allocator. Stop this executor formulation rather than tuning it indefinitely; revisit robust stochastic objectives or repeated-scenario training.
-
-### Both worsen
-
-Retain the incumbent executor. The headroom remains environmental/stochastic but this allocation mechanism is not the solution.
-
-No confirmation block is consumed during screening.
+- `20000–20399`: reserved reliability-aware confirmation. Leave untouched because the executor did not earn a freeze.
+- `18000–18399`: reserved for the earlier evidence-hardening protocol. Do not repurpose.
