@@ -41,14 +41,18 @@ PLANNING_DEV_SEEDS = tuple(range(13000, 13400))
 # abandoned V1 planner; do not silently repurpose it for V2.
 PLANNING_CONFIRM_SEEDS = tuple(range(14000, 14400))
 
-# Rolling-horizon planner V2 development. V2 fixes the receding-horizon
-# procrastination mechanism while keeping the same incumbent 60-token strategy.
+# Rolling-horizon planner V2 development: fully consumed. The corrected planner
+# tied/slightly underperformed one-step execution and did not earn confirmation.
 PLANNING_V2_DEV_SEEDS = tuple(range(15000, 15400))
-
-# Reserved confirmation for a future frozen planning V2 architecture. Do not
-# inspect until the planner semantics, training protocol and primary estimand are
-# explicitly frozen.
 PLANNING_V2_CONFIRM_SEEDS = tuple(range(16000, 16400))
+
+# Simulator-v2 evidence-hardening development. This block is for indexed-random
+# common-random-number validation, headroom diagnostics, and failure attribution.
+EVIDENCE_DEV_SEEDS = tuple(range(17000, 17400))
+
+# Reserved evidence block for a future frozen simulator-v2/incumbent protocol.
+# Do not inspect during headroom design or architecture iteration.
+EVIDENCE_CONFIRM_SEEDS = tuple(range(18000, 18400))
 
 SPLITS = {
     "train": TRAIN_SEEDS,
