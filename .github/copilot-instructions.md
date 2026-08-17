@@ -1,21 +1,13 @@
 # AegisSwarm coding-agent instructions
 
-Before making changes, read in this order:
+Read first:
 
 1. `/AGENTS.md`
 2. `/docs/AEGISSWARM_SKILL.md`
 3. `/docs/AEGISSWARM_STATUS.md`
 4. `/EVIDENCE_HARDENING.md`
-5. `/ROLLING_HORIZON.md` for completed planner history
-
-The architecture is **not frozen for external claims**. `AEGISSWARM_STATUS.md` is the latest-state overlay and supersedes older current-status wording when they differ.
-
-Active branch/protocol:
-
-```text
-agent/evidence-hardening
-aegisswarm-evidence-hardening-v1
-```
+5. `/RELIABILITY_AWARE.md`
+6. `/ROLLING_HORIZON.md` for completed planner history
 
 Current incumbent:
 
@@ -25,15 +17,20 @@ Current incumbent:
 + one-step RuleGuidedHungarianPolicy
 ```
 
-Do not reopen optimizer-native V3 or rolling-horizon V3 by default. Those tracks were closed by controlled development evidence.
+Completed Simulator V2 headroom development found essentially zero perfect-sensing headroom but large deterministic-interaction diagnostic headroom (`+19.8` pp, CI entirely positive).
 
-The active phase introduces an opt-in `SimulatorV2` with policy-independent indexed random draws and a frozen-program headroom suite. Legacy `Simulator` remains untouched. Never silently mix simulator generations in one claim.
+The reliability-aware executor screen is also complete:
 
-Evidence blocks:
+```text
+incumbent:             0.809
+weighted:              0.810
+contingent backup:     0.825
+weighted-incumbent:   +0.0003 CI=[-0.0165,+0.01775]
+backup-incumbent:     +0.0155 CI=[-0.00625,+0.03575625]
+```
 
-- `17000–17399`: development
-- `18000–18399`: reserved evidence/confirmation; do not inspect during development
+Do not treat backup as the incumbent and do not consume `20000–20399` confirmation. Weighting-only is a null result; backup is only a weak positive.
 
-Diagnostic perfect-sensing, deterministic-interaction, combined, and best-of-5 oracle results are **development headroom probes**, not deployable assumptions or mathematical upper bounds.
+Next direction: stochastic-robust 60-token strategy training under Simulator V2 with multiple matched random tapes per structural scenario. The first version should retain the existing scalar fitness averaged over replications; do not introduce CVaR/risk weights yet. Compare incumbent-executor and backup-executor training under matched search budgets. Do not reopen Axplorer, optimizer-native V3, rolling-horizon V3, or sensing work by default.
 
-Do not change protocol semantics or make broad superiority claims without following the handoff documents.
+Legacy `Simulator` and `SimulatorV2` are separate protocol generations. Never silently mix them in a claim.

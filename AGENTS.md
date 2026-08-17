@@ -2,99 +2,102 @@
 
 This repository is an active research project. **The architecture is not frozen for external claims.**
 
-Before changing algorithms, experiments, seed splits, claims, or submission material, read in this order:
+Read in order before changing algorithms, protocols, seeds, or claims:
 
-1. [`docs/AEGISSWARM_SKILL.md`](docs/AEGISSWARM_SKILL.md) — canonical long-form history/methodology.
-2. [`docs/AEGISSWARM_STATUS.md`](docs/AEGISSWARM_STATUS.md) — latest-result/current-decision overlay; this supersedes older current-status wording.
-3. [`EVIDENCE_HARDENING.md`](EVIDENCE_HARDENING.md) — active simulator-v2/headroom protocol.
-4. [`ROLLING_HORIZON.md`](ROLLING_HORIZON.md) — completed planner V1/V2 history.
+1. `docs/AEGISSWARM_SKILL.md` — long-form history.
+2. `docs/AEGISSWARM_STATUS.md` — latest-state overlay; supersedes older current wording.
+3. `EVIDENCE_HARDENING.md` — completed Simulator V2/headroom protocol.
+4. `RELIABILITY_AWARE.md` — completed reliability-executor screen.
+5. `ROLLING_HORIZON.md` — completed planner history.
 
 ## Non-negotiable rules
 
 1. Never consume reserved confirmation seeds for development.
 2. Once inspected, a block is never untouched again.
-3. Do not silently change simulator/scoring/budgets inside an evidence protocol.
+3. Do not silently change simulator/scoring/budgets inside a protocol.
 4. Compare components by ablation, not ideology.
 5. Existing Hungarian and tabular-Q baselines are simple baselines, not representatives of optimization/RL generally.
 6. Keep implementation abstract, synthetic, defensive, and decision-support oriented.
 7. Record protocol IDs, seeds, budgets, source commit, artifacts, uncertainty, and architecture changes caused by inspected results.
 8. Keep handoff/status docs current after major experiments.
-9. Do not run a reserved confirmation merely because a development result is positive.
-10. Simulator-version results must remain labeled. Legacy `Simulator` and `SimulatorV2` are different protocol generations.
+9. Do not run confirmation merely because a quick or development point estimate is positive.
+10. Legacy `Simulator` and `SimulatorV2` are different protocol generations; label them explicitly.
 
-## Current incumbent architecture
+## Current incumbent
 
 ```text
 60-token state-reactive rule representation
 + optimizer-aware local/evolutionary offline search
-+ one-step RuleGuidedHungarianPolicy execution
++ one-step RuleGuidedHungarianPolicy
 ```
 
-Do not reopen proposer/vector/planner tuning by default. The evidence to date is:
+No tested proposer, compact representation, planner, or reliability executor has robustly replaced this architecture.
 
-- hybrid-objective local `0.805`, Axplorer `0.810`, delta `+0.0055`, CI `[-0.0235,+0.0320]`;
-- optimizer-native V2 rules `0.813` vs native `0.701`, delta `-0.1120`, CI `[-0.1405,-0.08249]`;
-- rolling-horizon V2 one-step `0.808` vs rolling `0.801`, delta `-0.0065`, CI `[-0.0325,+0.01825]`, ~14x slower.
+## Key completed evidence
 
-## Closed tracks
+### Optimizer-native V2
 
-- optimizer-native representation: closed; no V3; do not use `12000–12399` confirmation.
-- rolling-horizon V1/V2: closed; no planner-aware training or planner V3 by default; do not use `16000–16399` confirmation.
+Rules `0.813` vs native `0.701`; native-rule `-0.1120`, CI `[-0.1405,-0.08249]`. Representation track closed.
 
-## Active phase — evidence hardening / simulator headroom
+### Rolling-horizon V2
 
-Branch: `agent/evidence-hardening`  
-Protocol: `aegisswarm-evidence-hardening-v1`
+One-step `0.808` vs rolling `0.801`; delta `-0.0065`, CI `[-0.0325,+0.01825]`, about 14x slower. Planner track closed.
 
-The active code adds an **opt-in** `SimulatorV2` with indexed event randomness. Legacy `Simulator` remains untouched for reproducibility.
+### Simulator V2 headroom
 
-New core files:
+Fresh `17000–17399`:
 
-- `aegisswarm/random_tape.py`
-- `aegisswarm/simulator_v2.py`
-- `aegisswarm/evidence_hardening.py`
-- `aegisswarm/evidence_hardening_cli.py`
-- `tests/test_evidence_hardening.py`
-- `EVIDENCE_HARDENING.md`
-
-Frozen incumbent programs are evaluated under:
-
-- normal Simulator V2;
-- perfect-sensing diagnostic;
-- deterministic-interaction diagnostic;
-- combined diagnostic;
-- best-of-5 per-scenario oracle;
-- fixed-optimizer V2 baseline;
-- descriptive legacy-Simulator reference.
-
-Diagnostic relaxations are not deployable assumptions or mathematical upper bounds. Best-of-5 is a non-deployable oracle.
-
-## Active evidence blocks
-
-- `17000–17399`: development
-- `18000–18399`: reserved evidence/confirmation — do not inspect
-
-Quick mode consumes only `17000–17019` as development.
-
-## Immediate runbook
-
-```bash
-git checkout agent/evidence-hardening
-git pull origin agent/evidence-hardening
-pytest -q
-python -m aegisswarm.evidence_hardening_cli --workers 14
+```text
+normal incumbent:              0.801
+perfect sensing:               0.801
+deterministic interactions:    0.999
+interaction headroom:         +0.1980 CI=[+0.166,+0.23625]
+best-of-5 oracle:              0.938
 ```
 
-Do not run `--full` until quick output is inspected. If quick is valid:
+The deterministic-success relaxation is a loose diagnostic, not an attainable claim. Normal episodes averaged ~15.66 failed real interaction attempts and exhausted abstract uses in ~85.15% of program-scenario episodes.
 
-```bash
-python -m aegisswarm.evidence_hardening_cli --full --workers 14
+### Reliability-aware executor screen
+
+Fresh `19000–19399`:
+
+```text
+incumbent:                    0.809
+reliability weighted:         0.810
+contingent backup:            0.825
+weighted-incumbent:          +0.0003 CI=[-0.0165,+0.01775]
+backup-incumbent:            +0.0155 CI=[-0.00625,+0.03575625]
+backup-weighted:             +0.0152 CI=[-0.00825,+0.0375]
+backup per-program deltas:   [-0.0025,+0.025,+0.020,+0.02875,+0.00625]
 ```
 
-## Decision after headroom measurement
+Decision:
 
-- large best-of-5 gap -> investigate strategy selector/meta-policy;
-- large sensing gap -> prioritize observation/state-estimation/sensor-allocation research;
-- large stochastic-interaction gap -> prioritize robustness/risk-aware objectives and stochastic replication;
-- large resource/overload residual -> sequential resource allocation/adaptive methods become better motivated;
-- small headroom -> stop chasing a higher score in this benchmark and move to richer scenarios, robustness, tail risk, stronger baselines, scaling, and external calibration.
+- weighting-only is a null result;
+- backup is a weak positive but does not establish superiority;
+- do not use `20000–20399` confirmation;
+- do not declare backup the incumbent;
+- stop one-step executor micro-tuning by default.
+
+## Next research direction — stochastic-robust training
+
+The current rule programs were discovered under the legacy simulator with one stochastic realization per training scenario. Simulator V2 evidence shows stochastic interaction outcomes are the dominant measured loss source.
+
+Next hypothesis:
+
+> Does training each 60-token strategy over multiple matched Simulator V2 random tapes per scenario improve expected performance on fresh stochastic scenarios?
+
+Protocol requirements:
+
+- separate structural scenario seed from random-tape seed;
+- preserve `SimulatorV2` default behavior for all completed protocols;
+- use common random tapes across candidate programs within each search run;
+- first version optimizes the existing scalar fitness averaged over all scenario×tape replications; no new CVaR/risk-weight hyperparameter yet;
+- conventional local/evolutionary search only for the first screen; Axplorer is not needed;
+- compare robust training through the incumbent executor against robust training through contingent backup under the same search seeds, candidate budget, structural worlds, and tape bundle;
+- keep old frozen programs as descriptive references;
+- use fresh training/development/confirmation blocks because this direction was selected after inspecting `17000–17399` and `19000–19399`.
+
+## Secondary track
+
+Best-of-5 oracle headroom is `+13.62` pp. Context-dependent strategy selection remains justified later, but robust stochastic training is first because the interaction headroom is larger and directly diagnosed.

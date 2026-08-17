@@ -1,13 +1,13 @@
 # AegisSwarm — Current Research Status
 
 **Updated:** 2026-08-17  
-**Architecture status:** INCUMBENT SELECTED; NEW RELIABILITY-AWARE EXECUTOR EXPERIMENT JUSTIFIED  
-**Completed protocol:** `aegisswarm-evidence-hardening-v1`  
-**Current decision:** INTERACTION RELIABILITY IS THE DOMINANT MEASURED HEADROOM SOURCE; TEST RELIABILITY-AWARE ASSIGNMENT ON FRESH DEVELOPMENT DATA
+**Architecture status:** RELIABILITY EXECUTOR SCREEN COMPLETE; STOCHASTIC-ROBUST TRAINING IS NEXT  
+**Active branch:** `agent/reliability-aware-assignment`  
+**Completed protocol:** `aegisswarm-reliability-aware-screen-v1`
 
-Read `docs/AEGISSWARM_SKILL.md` for long-form history and `EVIDENCE_HARDENING.md` for the completed headroom protocol.
+Read `docs/AEGISSWARM_SKILL.md` for long-form history, `EVIDENCE_HARDENING.md` for Simulator V2 headroom evidence, and `RELIABILITY_AWARE.md` for the completed executor screen.
 
-## Incumbent before the next experiment
+## Incumbent architecture
 
 ```text
 60-token state-reactive rule representation
@@ -15,112 +15,71 @@ Read `docs/AEGISSWARM_SKILL.md` for long-form history and `EVIDENCE_HARDENING.md
 + one-step RuleGuidedHungarianPolicy executor
 ```
 
-This remains the incumbent until a fresh controlled experiment demonstrates a better executor.
+The incumbent is not replaced by the reliability screen.
 
-## Completed evidence-hardening result
+## Why stochastic reliability is the main bottleneck
 
-Simulator V2 uses policy-independent indexed random draws and leaves the legacy simulator untouched. Full development used fresh seeds `17000–17399` and the same five frozen incumbent programs.
+Evidence-hardening development on fresh Simulator V2 seeds `17000–17399` found:
 
 ```text
-legacy incumbent reference:       0.818
-fixed optimizer v2:               0.326
 incumbent v2 normal:              0.801
-perfect sensing diagnostic:       0.801
-deterministic interaction diag:   0.999
-combined relaxation diagnostic:   0.999
+perfect sensing diagnostic:      0.801
+deterministic interaction diag:  0.999
 best-of-5 oracle v2:              0.938
 sensing headroom:                -0.0005 CI=[-0.00225, 0.0]
 interaction headroom:            +0.1980 CI=[0.166, 0.23625]
-combined headroom:               +0.1980 CI=[0.1645, 0.235]
 ```
 
-Normal per-program survival:
+Normal program-scenario episodes averaged `15.661` failed real interaction attempts and exhausted abstract uses in `85.15%` of episodes. Undetected penetrations were zero. The deterministic-success result is a loose counterfactual diagnostic, not an attainable-policy or mathematical upper-bound claim.
+
+## Reliability-aware executor screen — COMPLETE
+
+Fresh development block `19000–19399`, five frozen incumbent programs, Simulator V2 indexed randomness:
 
 ```text
-[0.7438, 0.8313, 0.8063, 0.8150, 0.8100]
+incumbent survival:               0.809
+reliability-weighted survival:    0.810
+contingent-backup survival:       0.825
+weighted - incumbent:            +0.0003 CI=[-0.0165, +0.01775]
+backup - incumbent:              +0.0155 CI=[-0.00625, +0.03575625]
+backup - weighted:               +0.0152 CI=[-0.00825, +0.0375]
+per-program weighted deltas:      [+0.0050, -0.0125, +0.00125, +0.00875, -0.00125]
+per-program backup deltas:        [-0.0025, +0.0250, +0.0200, +0.02875, +0.00625]
+resources consumed inc/wgt/bak:   31.492 / 31.494 / 31.547
+real interaction failures:        15.422 / 15.460 / 15.908
+runtime inc/wgt/bak:              0.0218s / 0.0219s / 0.0450s
 ```
 
-Best-of-5 oracle gap: `+0.1362` survival. Oracle choice counts across the 400 scenarios:
+### Decision
 
-```text
-{program0: 63, program1: 180, program2: 77, program3: 53, program4: 27}
-```
+1. **Reliability-weighted Hungarian is effectively a null result.** The full-screen point estimate is only `+0.03` percentage points and the interval is centered on zero. Do not pursue weighting-only variants.
+2. **Contingent backup is a weak positive, not an established win.** Its point estimate is `+1.55` pp, four of five program-level effects are positive, but the hierarchical interval crosses zero and runtime is about 2x the incumbent.
+3. Do **not** consume `20000–20399` confirmation. The executor has not earned a freeze.
+4. Do **not** declare backup the incumbent or launch a confirmation campaign.
+5. The executor experiment captures only a small fraction of the `+19.8` pp interaction headroom. The next hypothesis should therefore operate at the training/objective level rather than add more one-step assignment heuristics.
 
-Normal Simulator V2 diagnostic means:
+## Next experiment — stochastic-robust strategy training
 
-```text
-detection_opportunities:               58.4975
-detections:                            29.9975
-real_interaction_attempts:             30.2020
-real_interaction_failures:             15.6610
-decoy_resource_uses:                    1.3665
-penetrations_undetected:                0.0000
-penetrations_no_in_range_defender:      0.0000
-penetrations_in_range_no_resource:      2.0450
-penetrations_with_reachable_resource:   0.4350
-overload_steps:                        42.6960
-resource_uses_remaining:                0.5315
-resource_exhausted fraction:            0.8515
-```
+The current 60-token programs were discovered under the legacy simulator, where each candidate sees one stochastic realization per training scenario. That is misaligned with the Simulator V2 evidence: stochastic interaction outcomes are the dominant measured loss source.
 
-Development-only failed-episode attribution:
+Next question:
 
-```text
-interaction_stochasticity:      0.9956268
-strategy_selection_headroom:    0.0029155
-interaction_failure_residual:   0.0014577
-```
+> Holding the 60-token representation and conventional local/evolutionary search family fixed, does training each candidate across multiple policy-independent Simulator V2 random tapes per scenario produce strategies that generalize better under stochastic interaction outcomes?
 
-Interpretation boundary: the deterministic-interaction relaxation is a loose counterfactual diagnostic, not an attainable-policy claim or mathematical upper bound. The attribution says failed episodes improve under the relaxation; it is descriptive rather than causal proof.
+The next protocol should:
 
-## Main conclusion from headroom measurement
+- keep scenario geometry and random-tape seeds separate;
+- evaluate every candidate on the same matched random tapes (common random numbers);
+- average the existing scalar fitness over repeated tapes; do not introduce a CVaR/risk-weight hyperparameter in the first version;
+- compare robust training with the incumbent executor against robust training with contingent backup under the same candidate budget and tape bundle;
+- retain the old frozen incumbent programs as a reference only;
+- use fresh training/development/confirmation seeds because the protocol is motivated by inspected `17000–17399` and `19000–19399` results.
 
-The repeated ~80% regime is **not explained by sensing** and is **not close to the loose simulator envelope**.
+No Axplorer/proposer comparison is needed in this first robust-training experiment; local/evolutionary search is the strongest established search baseline.
 
-The strongest measured bottleneck is the combination of stochastic abstract interaction outcomes and scarce resource use:
+## Secondary future track
 
-- perfect sensing changes survival by essentially zero;
-- deterministic valid interactions add about `+19.8` percentage points with a hierarchical CI entirely above zero;
-- normal episodes average `15.661` failed real interaction attempts;
-- resources are fully exhausted in about `85.15%` of program-scenario episodes;
-- undetected penetrations are zero;
-- decoy consumption is comparatively small.
-
-This motivates an executor that explicitly accounts for expected interaction success and scarce capacity rather than another proposer, strategic representation, or longer planning horizon.
-
-## Secondary conclusion — strategy specialization
-
-The non-deployable best-of-5 oracle reaches `0.938`, a `+13.62` pp gap above the mean frozen incumbent. All five programs are selected in some scenarios, so scenario-dependent strategy specialization is real enough to justify a later selector/meta-policy experiment.
-
-This is secondary to reliability-aware assignment because interaction headroom is larger and directly tied to resource loss.
-
-## Next experiment — reliability-aware assignment
-
-New architecture question:
-
-> Holding the five frozen 60-token programs fixed, can an executor that incorporates abstract success probability and limited contingent backup allocation improve survival/resource efficiency over the current one-step Hungarian executor?
-
-The experiment should separate two effects:
-
-1. **reliability-weighted one-to-one assignment** — same one-to-one semantics as the incumbent, but strategic utility is weighted by abstract success probability;
-2. **reliability-aware contingent backup allocation** — allow at most one backup resource for a high-value threat and optimize expected strategic value under stochastic failure, while preserving each defender's one-assignment-per-step constraint.
-
-No strategy retraining in the initial screen. No change to sensing, scenario generation, or stochastic interaction law.
-
-Because this architecture is motivated by the inspected `17000–17399` development result, it must use fresh evidence blocks.
-
-Proposed fresh blocks:
-
-- `19000–19399`: reliability-aware development
-- `20000–20399`: reserved reliability-aware confirmation — do not inspect during development
-
-Keep `18000–18399` untouched and tied to the completed evidence-hardening protocol; do not repurpose it.
-
-## Closed tracks
-
-- optimizer-native V2: materially worse; no V3; do not use `12000–12399` confirmation;
-- rolling-horizon V1/V2: no useful gain and much slower; no planner V3; do not use `16000–16399` confirmation;
-- sensing as the immediate bottleneck: not supported by evidence-hardening development.
+The best-of-5 frozen-program oracle reached `0.938`, a `+13.62` pp gap over mean incumbent performance. Context-dependent strategy selection remains a justified secondary experiment, but it follows stochastic-robust training because the interaction-reliability headroom is larger and more directly diagnosed.
 
 ## Evidence ledger
 
@@ -136,8 +95,9 @@ Consumed development/evidence includes:
 - `13000–13399`: rolling-horizon V1 development
 - `15000–15399`: rolling-horizon V2 development
 - `17000–17399`: evidence-hardening/headroom development
+- `19000–19399`: reliability-aware executor development
 
-Untouched reserved blocks tied to older protocols:
+Untouched reserved blocks tied to older protocols must not be silently repurposed:
 
 - `6000–6399`
 - `7000–7399`
@@ -147,22 +107,24 @@ Untouched reserved blocks tied to older protocols:
 - `14000–14399`
 - `16000–16399`
 - `18000–18399`
+- `20000–20399` — reliability-aware confirmation; **do not run**
 
 ## Claims policy
 
-Supported development-level conclusions now include:
+Supported development-level conclusions:
 
-- the incumbent remains much stronger than the fixed hand-written optimizer baseline in the synthetic simulator;
-- Axplorer did not materially outperform optimizer-aware local/evolutionary search under the matched protocol;
-- optimizer-native V2 was materially worse than the 60-token rule representation;
-- corrected rolling-horizon execution did not improve the incumbent and was substantially slower;
-- under Simulator V2, perfect sensing produced essentially no survival headroom on `17000–17399`;
-- deterministic valid interactions produced a large positive diagnostic headroom (`+19.8` pp, CI `[+16.6,+23.625]` pp);
-- a best-of-5 frozen-program oracle produced substantial scenario-selection headroom (`+13.62` pp).
+- optimizer-aware 60-token rule search remains the strategic incumbent;
+- optimizer-native V2 was materially worse;
+- corrected rolling-horizon execution did not improve the incumbent;
+- perfect-sensing headroom was essentially zero on `17000–17399`;
+- deterministic valid interactions showed large diagnostic headroom (`+19.8` pp, CI entirely positive);
+- best-of-5 frozen-program oracle showed substantial scenario-selection headroom (`+13.62` pp);
+- reliability-weighted Hungarian did not improve survival on the full fresh screen;
+- contingent backup produced a small positive point estimate (`+1.55` pp) but did not establish a robust improvement.
 
 Not supported:
 
-- that deterministic interactions are attainable in a deployable system;
-- that reliability-aware assignment will improve performance before it is tested on fresh data;
+- deterministic interaction success as attainable;
+- contingent-backup executor superiority;
 - superiority to optimization or RL generally;
 - real-world effectiveness or deployment readiness.
