@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
+from .models import ThreatType
 from .rule_program import Action, RuleProgramPolicy
 from .policies import distance_to_target
 
@@ -60,7 +61,10 @@ class RuleGuidedHungarianPolicy(RuleProgramPolicy):
                 and defender.assigned_threat_id == threat.id
             ):
                 score += rule.magnitude
-            elif rule.action == Action.PENALIZE_DECOY and threat.threat_type.name == "DECOY":
+            elif (
+                rule.action == Action.PENALIZE_DECOY
+                and threat.threat_type == ThreatType.DECOY
+            ):
                 score -= rule.magnitude
 
         if defender.remaining_uses <= reserve and d_asset > 10.0:
