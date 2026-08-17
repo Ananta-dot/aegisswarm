@@ -1,6 +1,10 @@
 import numpy as np
 
 from aegisswarm.hybrid import RuleGuidedHungarianPolicy
+from aegisswarm.hybrid_ablation import (
+    evaluate_greedy_program_runs,
+    evaluate_hybrid_program_runs,
+)
 from aegisswarm.hybrid_search import evaluate_hybrid_program
 from aegisswarm.rule_program import MAX_RULES, RULE_WIDTH, TOKEN_LEVELS
 from aegisswarm.scenarios import ScenarioGenerator
@@ -66,6 +70,18 @@ def test_hybrid_evaluator_exposes_same_fitness_metrics():
         "mean_response_delay",
     ):
         assert key in metrics
+
+
+def test_hybrid_and_greedy_parallel_evaluators_spawn_cleanly():
+    neutral = np.zeros(MAX_RULES * RULE_WIDTH, dtype=np.int16)
+    subtract = _all_subtract_program()
+    programs = [neutral, subtract]
+
+    greedy = evaluate_greedy_program_runs(programs, seeds=(0,), workers=2)
+    hybrid = evaluate_hybrid_program_runs(programs, seeds=(0,), workers=2)
+
+    assert greedy["matrices"]["asset_survival_rate"].shape == (2, 1)
+    assert hybrid["matrices"]["asset_survival_rate"].shape == (2, 1)
 
 
 def test_hybrid_seed_blocks_are_separate_from_previous_evidence():
