@@ -1,10 +1,14 @@
 import numpy as np
 
 from aegisswarm.final_proof import (
+    BudgetedRuleOracle,
     hierarchical_bootstrap_ci,
     paired_hierarchical_bootstrap,
     paired_sign_flip_pvalue,
 )
+from aegisswarm.final_runtime_patch import install_budgeted_oracle_patch
+from aegisswarm.rule_program import random_program
+from aegisswarm.scoring import EvalConfig
 from aegisswarm.splits import (
     TRAIN_SEEDS,
     VALIDATION_SEEDS,
@@ -47,3 +51,16 @@ def test_paired_statistics_detect_clear_improvement():
 
     p = paired_sign_flip_pvalue(local, axplorer, n_perm=2000)
     assert p < 0.01
+
+
+def test_budgeted_oracle_parallel_candidate_scoring():
+    install_budgeted_oracle_patch()
+    cfg = EvalConfig(seeds=(0,), n_threats=8, n_defenders=3, max_steps=30)
+    rng = np.random.default_rng(123)
+    programs = [random_program(rng), random_program(rng)]
+
+    with BudgetedRuleOracle(cfg, budget=2, workers=2) as oracle:
+        added = oracle.evaluate_many(programs)
+        assert added == 2
+        assert oracle.evaluations == 2
+        assert len(oracle.cache) == 2
