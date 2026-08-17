@@ -73,7 +73,9 @@ The protocol also reports:
 - mean modal fraction of tape-specific hindsight choices within each world;
 - the fraction of the single-tape oracle gap retained by the cross-tape gap.
 
-## Quick screen
+## Quick screen — COMPLETED
+
+Quick used:
 
 ```text
 worlds:       30000–30019 (20)
@@ -81,44 +83,63 @@ tapes/world:  4
 programs:     5 frozen incumbents
 ```
 
-Run:
+Result:
 
-```bash
-python -m aegisswarm.oracle_decomposition_cli --workers 14
+```text
+program mean survivals:          [0.7438, 0.8375, 0.8125, 0.7750, 0.8125]
+single-tape fixed survival:      0.925
+single-tape oracle survival:     0.975
+single-tape oracle - fixed:     +0.0500 CI=[0.0000,+0.1250]
+expected fixed survival:         0.8375
+expected oracle survival:        0.9000
+expected oracle - fixed:        +0.0625 CI=[+0.01875,+0.10625]
+cross-tape fixed survival:       0.8375
+cross-tape oracle survival:      0.8063
+cross-tape oracle - fixed:      -0.0312 CI=[-0.0875,+0.03125]
+cross-tape choice agreement:     0.450
+tape-oracle modal fraction:      0.575
+stable fraction of raw gap:     -0.625
 ```
 
-Do not run `--full` until the quick decomposition is inspected.
+### Quick interpretation
 
-## Full development
+The optimistic oracle survives when choice and scoring use the same stochastic evidence, but does not survive held-out tapes. The primary cross-tape estimate is negative and the best-program identity is unstable between tape halves.
 
-If the quick result is informative and numerically stable:
+The negative stable-fraction statistic is not a literal negative-headroom claim. It indicates that the held-out estimate reverses sign relative to the positive same-realization oracle gap.
+
+This is strong quick evidence that a large fraction of the raw oracle gap is stochastic hindsight rather than stable episode-level strategy specialization.
+
+## Full development — AUTHORIZED
+
+The purpose of this diagnostic is to decide whether episode-level specialization exists at all. Twenty structural worlds are insufficient to permanently close the direction because the cross-tape CI remains wide.
+
+Freeze the implementation and run:
 
 ```text
 worlds:       30000–30399 (400)
 tapes/world:  8
+programs:     5 frozen incumbents
 ```
-
-Run:
 
 ```bash
 python -m aegisswarm.oracle_decomposition_cli --full --workers 14
 ```
 
-Do not inspect `31000–31399` unless an independent diagnostic replication is explicitly justified.
+Do not inspect `31000–31399` unless an independent replication is explicitly justified after full development.
 
-## Interpretation gate
+## Full-development interpretation gate
 
-### Cross-tape gap remains large
+### Cross-tape gap becomes materially positive
 
-If a substantial fraction of the raw oracle gap survives held-out tapes and best-program choices are reasonably stable, there is genuine structural strategy specialization. A richer observable or later-state gating architecture becomes scientifically justified.
+If a substantial fraction of the raw oracle gap survives held-out tapes and best-program choices become reasonably stable, there is genuine structural strategy specialization. A richer observable or later-state gating architecture becomes scientifically justified.
 
-### Cross-tape gap collapses
+### Cross-tape gap stays near zero or negative
 
-If the raw oracle is large but cross-tape headroom is near zero and choice agreement is low, most apparent oracle headroom is stochastic hindsight. Stop treating ~93–94% raw oracle survival as a realistic selector target.
+Close episode-level frozen-program selection. Stop treating ~93–94% raw oracle survival as a realistic selector target. Prefer a robust global strategy or a policy that adapts from realized state over time.
 
-### Cross-tape oracle is worse than fixed
+### Same-tape/expected oracle stays large while cross-tape remains weak
 
-Per-world strategy identity is actively unstable across stochastic outcomes. Prefer a robust global strategy or a policy that adapts from realized state over time rather than episode-level preselection.
+Treat the difference as stochastic hindsight. Do not tune more selector models against the raw oracle labels.
 
 ## Claim boundary
 
