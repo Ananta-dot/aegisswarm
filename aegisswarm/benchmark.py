@@ -8,6 +8,7 @@ from .simulator import Simulator
 from .policies import BASELINE_POLICIES
 from .optimization import HungarianPolicy
 from .strategy import GenomePolicy
+from .rule_program import RuleProgramPolicy
 from .rl import QLearningPolicy
 
 
@@ -31,18 +32,38 @@ def evaluate_policies(
     scenario_kwargs=None,
     qtable=None,
     genome=None,
+    local_genome=None,
+    axplorer_genome=None,
+    rule_local_program=None,
+    rule_axplorer_program=None,
 ):
+    """Evaluate all supplied policies on identical seeded scenarios.
+
+    `genome` is retained as a backward-compatible alias for the legacy Axplorer genome.
+    New experiments should use explicit names so ablation labels remain unambiguous.
+    """
     scenario_kwargs = dict(scenario_kwargs or {})
     gen = ScenarioGenerator(max_steps=int(scenario_kwargs.pop("max_steps", 150)))
 
     factories = dict(BASELINE_POLICIES)
     factories["hungarian"] = HungarianPolicy
-
     policies = {name: factory() for name, factory in factories.items()}
+
     if qtable is not None:
         policies["q_learning"] = QLearningPolicy(qtable)
-    if genome is not None:
-        policies["axplorer"] = GenomePolicy(genome, name="axplorer")
+
+    if local_genome is not None:
+        policies["legacy_local"] = GenomePolicy(local_genome, name="legacy_local")
+
+    legacy_ax = axplorer_genome if axplorer_genome is not None else genome
+    if legacy_ax is not None:
+        policies["legacy_axplorer"] = GenomePolicy(legacy_ax, name="legacy_axplorer")
+
+    if rule_local_program is not None:
+        policies["rule_local"] = RuleProgramPolicy(rule_local_program, name="rule_local")
+
+    if rule_axplorer_program is not None:
+        policies["rule_axplorer"] = RuleProgramPolicy(rule_axplorer_program, name="rule_axplorer")
 
     raw = {name: [] for name in policies}
     runtime = {name: [] for name in policies}
