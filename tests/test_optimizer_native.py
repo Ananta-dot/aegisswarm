@@ -28,6 +28,8 @@ from aegisswarm.splits import (
     HYBRID_OBJECTIVE_DEV_SEEDS,
     NATIVE_OBJECTIVE_CONFIRM_SEEDS,
     NATIVE_OBJECTIVE_DEV_SEEDS,
+    NATIVE_OBJECTIVE_V2_CONFIRM_SEEDS,
+    NATIVE_OBJECTIVE_V2_DEV_SEEDS,
     V2_CONFIRM_SEEDS,
     V2_DEV_SEEDS,
 )
@@ -69,9 +71,6 @@ def test_native_v2_neutral_modifiers_keep_positive_structural_base():
     defender = scenario.defenders[0]
     threat = scenario.threats[0]
 
-    # Build one guaranteed reachable detected pair. All learned modifiers are
-    # neutral; only the shared structural base utility should make the pair
-    # attractive. This prevents regression to the V1 zero-centred no-op failure.
     for th in scenario.threats:
         th.detected = False
     threat.detected = True
@@ -120,9 +119,9 @@ def test_native_oracle_deduplicates_canonical_vectors():
         assert oracle.evaluations == 1
 
 
-def test_native_seed_blocks_are_fresh():
-    dev = set(NATIVE_OBJECTIVE_DEV_SEEDS)
-    confirm = set(NATIVE_OBJECTIVE_CONFIRM_SEEDS)
+def test_native_v2_seed_blocks_are_fresh():
+    v2_dev = set(NATIVE_OBJECTIVE_V2_DEV_SEEDS)
+    v2_confirm = set(NATIVE_OBJECTIVE_V2_CONFIRM_SEEDS)
     previous = (
         set(FINAL_HOLDOUT_SEEDS)
         | set(V2_DEV_SEEDS)
@@ -131,15 +130,17 @@ def test_native_seed_blocks_are_fresh():
         | set(HYBRID_CONFIRM_SEEDS)
         | set(HYBRID_OBJECTIVE_DEV_SEEDS)
         | set(HYBRID_OBJECTIVE_CONFIRM_SEEDS)
+        | set(NATIVE_OBJECTIVE_DEV_SEEDS)
+        | set(NATIVE_OBJECTIVE_CONFIRM_SEEDS)
     )
-    assert len(dev) == 400
-    assert NATIVE_OBJECTIVE_DEV_SEEDS[0] == 9000
-    assert NATIVE_OBJECTIVE_DEV_SEEDS[-1] == 9399
-    assert len(confirm) == 400
-    assert NATIVE_OBJECTIVE_CONFIRM_SEEDS[0] == 10000
-    assert NATIVE_OBJECTIVE_CONFIRM_SEEDS[-1] == 10399
-    assert dev.isdisjoint(previous | confirm)
-    assert confirm.isdisjoint(previous)
+    assert len(v2_dev) == 400
+    assert NATIVE_OBJECTIVE_V2_DEV_SEEDS[0] == 11000
+    assert NATIVE_OBJECTIVE_V2_DEV_SEEDS[-1] == 11399
+    assert len(v2_confirm) == 400
+    assert NATIVE_OBJECTIVE_V2_CONFIRM_SEEDS[0] == 12000
+    assert NATIVE_OBJECTIVE_V2_CONFIRM_SEEDS[-1] == 12399
+    assert v2_dev.isdisjoint(previous | v2_confirm)
+    assert v2_confirm.isdisjoint(previous)
 
 
 def test_native_confirmation_requires_explicit_freeze(tmp_path):
