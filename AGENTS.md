@@ -6,9 +6,10 @@ Read in order before changing algorithms, protocols, seeds, or claims:
 
 1. `docs/AEGISSWARM_SKILL.md` — long-form history.
 2. `docs/AEGISSWARM_STATUS.md` — latest-state overlay; supersedes older current wording.
-3. `EVIDENCE_HARDENING.md` — completed Simulator V2/headroom protocol.
-4. `RELIABILITY_AWARE.md` — completed reliability-executor screen.
-5. `ROLLING_HORIZON.md` — completed planner history.
+3. `STOCHASTIC_ROBUST.md` — active robust-training protocol.
+4. `EVIDENCE_HARDENING.md` — completed Simulator V2/headroom protocol.
+5. `RELIABILITY_AWARE.md` — completed reliability-executor screen.
+6. `ROLLING_HORIZON.md` — completed planner history.
 
 ## Non-negotiable rules
 
@@ -33,15 +34,7 @@ Read in order before changing algorithms, protocols, seeds, or claims:
 
 No tested proposer, compact representation, planner, or reliability executor has robustly replaced this architecture.
 
-## Key completed evidence
-
-### Optimizer-native V2
-
-Rules `0.813` vs native `0.701`; native-rule `-0.1120`, CI `[-0.1405,-0.08249]`. Representation track closed.
-
-### Rolling-horizon V2
-
-One-step `0.808` vs rolling `0.801`; delta `-0.0065`, CI `[-0.0325,+0.01825]`, about 14x slower. Planner track closed.
+## Completed evidence that matters now
 
 ### Simulator V2 headroom
 
@@ -67,8 +60,6 @@ reliability weighted:         0.810
 contingent backup:            0.825
 weighted-incumbent:          +0.0003 CI=[-0.0165,+0.01775]
 backup-incumbent:            +0.0155 CI=[-0.00625,+0.03575625]
-backup-weighted:             +0.0152 CI=[-0.00825,+0.0375]
-backup per-program deltas:   [-0.0025,+0.025,+0.020,+0.02875,+0.00625]
 ```
 
 Decision:
@@ -79,24 +70,50 @@ Decision:
 - do not declare backup the incumbent;
 - stop one-step executor micro-tuning by default.
 
-## Next research direction — stochastic-robust training
+## Active phase — stochastic-robust training V1
 
-The current rule programs were discovered under the legacy simulator with one stochastic realization per training scenario. Simulator V2 evidence shows stochastic interaction outcomes are the dominant measured loss source.
+Branch: `agent/stochastic-robust-training`  
+Protocol: `aegisswarm-stochastic-robust-training-v1`
 
-Next hypothesis:
+Hypothesis:
 
-> Does training each 60-token strategy over multiple matched Simulator V2 random tapes per scenario improve expected performance on fresh stochastic scenarios?
+> Does training each 60-token strategy over multiple matched Simulator V2 random tapes per structural scenario improve expected performance on fresh stochastic scenarios?
 
-Protocol requirements:
+V1 constraints:
 
-- separate structural scenario seed from random-tape seed;
-- preserve `SimulatorV2` default behavior for all completed protocols;
-- use common random tapes across candidate programs within each search run;
-- first version optimizes the existing scalar fitness averaged over all scenario×tape replications; no new CVaR/risk-weight hyperparameter yet;
-- conventional local/evolutionary search only for the first screen; Axplorer is not needed;
-- compare robust training through the incumbent executor against robust training through contingent backup under the same search seeds, candidate budget, structural worlds, and tape bundle;
-- keep old frozen programs as descriptive references;
-- use fresh training/development/confirmation blocks because this direction was selected after inspecting `17000–17399` and `19000–19399`.
+- 60-token representation unchanged;
+- local/evolutionary search only;
+- scoring weights unchanged;
+- structural world seed separated from random-tape seed inside the training evaluator;
+- common random tapes across all candidate programs and both training arms;
+- no CVaR/risk coefficient yet;
+- paired arms: train through incumbent executor vs train through contingent-backup executor;
+- 2×2 cross-evaluation after search to separate program adaptation and executor effect.
+
+Fresh blocks:
+
+- `21000–21031`: training structural worlds;
+- `22000–22399`: robust development evaluation;
+- `23000–23399`: reserved robust confirmation — **do not inspect**.
+
+Quick protocol:
+
+```text
+2 paired search runs
+128 candidate evaluations/arm/run
+4 structural worlds
+2 tapes/world
+8 rollouts/candidate
+20 evaluation scenarios (22000–22019)
+```
+
+Run only:
+
+```bash
+python -m aegisswarm.stochastic_robust_cli --workers 14
+```
+
+Do not run `--full` until the quick result is inspected.
 
 ## Secondary track
 
