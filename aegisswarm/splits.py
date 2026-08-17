@@ -32,14 +32,23 @@ NATIVE_OBJECTIVE_CONFIRM_SEEDS = tuple(range(10000, 10400))
 NATIVE_OBJECTIVE_V2_DEV_SEEDS = tuple(range(11000, 11400))
 NATIVE_OBJECTIVE_V2_CONFIRM_SEEDS = tuple(range(12000, 12400))
 
-# Rolling-horizon planning development. This block may be inspected/tuned during
-# planning architecture development and must never later be called untouched.
+# Rolling-horizon planner V1 development: fully consumed by the fixed-program
+# screen. V1 showed a negative point estimate and exposed an action-deferral
+# pathology. Never treat this block as unseen again.
 PLANNING_DEV_SEEDS = tuple(range(13000, 13400))
 
-# Reserved confirmation for a future frozen rolling-horizon architecture. Do not
-# inspect until the planning horizon, planner semantics, rule representation,
-# training protocol and primary estimand are frozen.
+# V1 planning confirmation was never used. Keep it untouched and tied to the
+# abandoned V1 planner; do not silently repurpose it for V2.
 PLANNING_CONFIRM_SEEDS = tuple(range(14000, 14400))
+
+# Rolling-horizon planner V2 development. V2 fixes the receding-horizon
+# procrastination mechanism while keeping the same incumbent 60-token strategy.
+PLANNING_V2_DEV_SEEDS = tuple(range(15000, 15400))
+
+# Reserved confirmation for a future frozen planning V2 architecture. Do not
+# inspect until the planner semantics, training protocol and primary estimand are
+# explicitly frozen.
+PLANNING_V2_CONFIRM_SEEDS = tuple(range(16000, 16400))
 
 SPLITS = {
     "train": TRAIN_SEEDS,
