@@ -6,10 +6,11 @@ Read in order before changing algorithms, protocols, seeds, or claims:
 
 1. `docs/AEGISSWARM_SKILL.md` — long-form history.
 2. `docs/AEGISSWARM_STATUS.md` — latest-state overlay; supersedes older current wording.
-3. `STOCHASTIC_ROBUST.md` — active robust-training protocol.
-4. `EVIDENCE_HARDENING.md` — completed Simulator V2/headroom protocol.
-5. `RELIABILITY_AWARE.md` — completed reliability-executor screen.
-6. `ROLLING_HORIZON.md` — completed planner history.
+3. `STOCHASTIC_TRAINING_ABLATION.md` — active V2 protocol.
+4. `STOCHASTIC_ROBUST.md` — closed V1 robust-training history.
+5. `EVIDENCE_HARDENING.md` — completed Simulator V2/headroom protocol.
+6. `RELIABILITY_AWARE.md` — completed reliability-executor screen.
+7. `ROLLING_HORIZON.md` — completed planner history.
 
 ## Non-negotiable rules
 
@@ -32,89 +33,62 @@ Read in order before changing algorithms, protocols, seeds, or claims:
 + one-step RuleGuidedHungarianPolicy
 ```
 
-No tested proposer, compact representation, planner, or reliability executor has robustly replaced this architecture.
+No tested proposer, compact representation, planner, reliability weighting, or backup executor has robustly replaced it.
 
-## Completed evidence that matters now
+## Key current-generation evidence
 
-### Simulator V2 headroom
+Simulator V2 headroom (`17000–17399`): normal `0.801`, perfect sensing `0.801`, deterministic interactions `0.999`, interaction diagnostic headroom `+0.1980 CI=[+0.166,+0.23625]`, best-of-5 oracle `0.938`.
 
-Fresh `17000–17399`:
+Reliability executor (`19000–19399`): incumbent `0.809`, weighted `0.810`, backup `0.825`; weighting is null and backup is only a weak positive (`+0.0155 CI=[-0.00625,+0.03575625]`). Do not inspect `20000–20399`.
 
-```text
-normal incumbent:              0.801
-perfect sensing:               0.801
-deterministic interactions:    0.999
-interaction headroom:         +0.1980 CI=[+0.166,+0.23625]
-best-of-5 oracle:              0.938
-```
-
-The deterministic-success relaxation is a loose diagnostic, not an attainable claim. Normal episodes averaged ~15.66 failed real interaction attempts and exhausted abstract uses in ~85.15% of program-scenario episodes.
-
-### Reliability-aware executor screen
-
-Fresh `19000–19399`:
+Stochastic-robust V1 quick (`22000–22019`) closed the backup/co-adaptation hypothesis:
 
 ```text
-incumbent:                    0.809
-reliability weighted:         0.810
-contingent backup:            0.825
-weighted-incumbent:          +0.0003 CI=[-0.0165,+0.01775]
-backup-incumbent:            +0.0155 CI=[-0.00625,+0.03575625]
+robust inc/inc:          0.713
+robust backup/backup:    0.625
+co-adapted delta:       -0.0875 CI=[-0.225,+0.05]
+per-run deltas:         [-0.05,-0.125]
 ```
 
-Decision:
+Do not run V1 full and do not inspect `23000–23399`. V1 quick inspected training worlds `21000–21003` and evaluation `22000–22019`; do not reuse the remainder of those V1 blocks as unseen evidence for a changed protocol.
 
-- weighting-only is a null result;
-- backup is a weak positive but does not establish superiority;
-- do not use `20000–20399` confirmation;
-- do not declare backup the incumbent;
-- stop one-step executor micro-tuning by default.
+## Active phase — stochastic-training ablation V2
 
-## Active phase — stochastic-robust training V1
+Branch: `agent/stochastic-training-ablation`  
+Protocol: `aegisswarm-stochastic-training-ablation-v2`
 
-Branch: `agent/stochastic-robust-training`  
-Protocol: `aegisswarm-stochastic-robust-training-v1`
+Primary comparison:
 
-Hypothesis:
+1. single-tape Simulator V2 training;
+2. repeated-tape Simulator V2 training.
 
-> Does training each 60-token strategy over multiple matched Simulator V2 random tapes per structural scenario improve expected performance on fresh stochastic scenarios?
+Both arms use the same incumbent `RuleGuidedHungarianPolicy`, 60-token representation, local/evolutionary search, search seeds, structural worlds, candidate budget and scalar score. The repeated arm includes the single arm's replicate-0 tape plus additional matched tapes for every world.
 
-V1 constraints:
+Fresh V2 blocks:
 
-- 60-token representation unchanged;
-- local/evolutionary search only;
-- scoring weights unchanged;
-- structural world seed separated from random-tape seed inside the training evaluator;
-- common random tapes across all candidate programs and both training arms;
-- no CVaR/risk coefficient yet;
-- paired arms: train through incumbent executor vs train through contingent-backup executor;
-- 2×2 cross-evaluation after search to separate program adaptation and executor effect.
+- `24000–24031`: structural training worlds;
+- `25000–25399`: development evaluation;
+- `26000–26399`: reserved confirmation — **do not inspect**.
 
-Fresh blocks:
-
-- `21000–21031`: training structural worlds;
-- `22000–22399`: robust development evaluation;
-- `23000–23399`: reserved robust confirmation — **do not inspect**.
-
-Quick protocol:
+Quick V2:
 
 ```text
 2 paired search runs
-128 candidate evaluations/arm/run
+128 candidates/arm/run
 4 structural worlds
-2 tapes/world
-8 rollouts/candidate
-20 evaluation scenarios (22000–22019)
+single:   1 tape/world = 4 rollouts/candidate
+repeated: 2 tapes/world = 8 rollouts/candidate
+evaluation: 25000–25019
 ```
 
 Run only:
 
 ```bash
-python -m aegisswarm.stochastic_robust_cli --workers 14
+python -m aegisswarm.stochastic_training_ablation_cli --workers 14
 ```
 
-Do not run `--full` until the quick result is inspected.
+Do not run `--full` until quick V2 is inspected.
 
 ## Secondary track
 
-Best-of-5 oracle headroom is `+13.62` pp. Context-dependent strategy selection remains justified later, but robust stochastic training is first because the interaction headroom is larger and directly diagnosed.
+Best-of-5 oracle headroom is `+13.62` pp. Context-dependent strategy selection is the leading separate hypothesis if repeated-tape training does not produce a useful gain.
