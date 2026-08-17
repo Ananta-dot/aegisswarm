@@ -7,31 +7,37 @@ from scipy.optimize import Bounds, LinearConstraint, milp
 from scipy.sparse import lil_matrix
 
 from .hybrid import RuleGuidedHungarianPolicy
-from .policies import distance_to_target
 
 
 class RuleGuidedRollingHorizonPolicy(RuleGuidedHungarianPolicy):
-    """Short-horizon abstract planner using the existing rule-derived utility.
+    """Short-horizon abstract planner using the incumbent rule-derived utility.
 
-    This changes temporal allocation, not strategic representation. The same
-    60-token rule program supplies pair utility. A small time-indexed binary
-    optimization problem allocates defender uses over several predicted
-    synthetic timesteps. Only the first-step decision is executed and the
-    problem is solved again after the next observation.
+    Planner V2 fixes an action-deferral pathology found in the V1 development
+    screen. V1 re-evaluated strategic utility on projected future states, so an
+    already-reachable threat could become more valuable at h>0 simply because it
+    was projected to be closer/more urgent. In receding-horizon control this can
+    repeatedly postpone an action.
 
-    Prediction is deliberately simple and platform-independent: currently
-    detected threats are projected linearly using their synthetic velocity.
+    V2 still uses projection to decide future reachability and whether a threat is
+    expected to have reached its synthetic target. But whenever a defender/threat
+    pair is already strategically valid and reachable now, future utility for that
+    same pair is capped at its current utility before temporal discounting. Thus
+    an identical feasible assignment cannot become more attractive merely by
+    waiting. The 60-token strategic representation itself is unchanged.
+
+    Only the first-step decision is executed; the plan is recomputed after the
+    next observation.
     """
 
-    name = "rule_guided_rolling_horizon"
+    name = "rule_guided_rolling_horizon_v2"
 
     def __init__(
         self,
         tokens,
-        horizon: int = 3,
+        horizon: int = 4,
         discount: float = 0.90,
         time_limit_seconds: float = 0.25,
-        name: str = "rule_guided_rolling_horizon",
+        name: str = "rule_guided_rolling_horizon_v2",
     ):
         super().__init__(tokens, name=name)
         self.horizon = max(1, int(horizon))
@@ -59,21 +65,44 @@ class RuleGuidedRollingHorizonPolicy(RuleGuidedHungarianPolicy):
         for di, defender in enumerate(defenders):
             for ti, threat in enumerate(threats):
                 asset = next(a for a in scenario.assets if a.id == threat.target_asset_id)
+
+                # Current utility is the anchor that prevents receding-horizon
+                # procrastination when the pair is already feasible now.
+                current_value = self.pair_utility(scenario, defender, threat)
+                current_positive = (
+                    current_value is not None and float(current_value) > 0.0
+                )
+
                 for h in range(self.horizon):
                     projected = self._project_threat(threat, scenario, h)
-                    # Do not schedule a future assignment after the simple
-                    # projection says the threat has already reached its target.
                     if h > 0 and projected.distance_to(asset.x, asset.y) <= asset.radius:
                         continue
-                    value = self.pair_utility(scenario, defender, projected)
-                    if value is None or value <= 0.0:
+
+                    projected_value = self.pair_utility(scenario, defender, projected)
+                    if projected_value is None or projected_value <= 0.0:
                         continue
+
+                    strategic_value = float(projected_value)
+                    if h > 0 and current_positive:
+                        # Future state can reduce the value of a currently
+                        # feasible pair, but cannot inflate it simply because we
+                        # waited. Discount then strictly weakens later execution.
+                        strategic_value = min(
+                            strategic_value,
+                            float(current_value),
+                        )
+
+                    utility = float((self.discount ** h) * strategic_value)
+                    if utility <= 0.0:
+                        continue
+
                     variables.append(
                         {
                             "defender_index": di,
                             "threat_index": ti,
                             "h": h,
-                            "utility": float((self.discount ** h) * value),
+                            "utility": utility,
+                            "current_positive": bool(current_positive),
                         }
                     )
         return defenders, threats, variables
@@ -98,8 +127,9 @@ class RuleGuidedRollingHorizonPolicy(RuleGuidedHungarianPolicy):
                     rows.append(idx)
                     upper.append(1.0)
 
-        # A threat receives at most one planned attempt over the deterministic
-        # horizon. The plan is discarded after the first real simulator step.
+        # Deterministic planning approximation: one planned attempt per threat
+        # over the horizon. The real simulator remains stochastic and the plan is
+        # discarded/re-solved after the first actual step.
         for ti, _ in enumerate(threats):
             idx = [
                 k for k, v in enumerate(variables)
@@ -150,7 +180,7 @@ class RuleGuidedRollingHorizonPolicy(RuleGuidedHungarianPolicy):
         defenders, threats, variables, solution = self._solve_plan(scenario)
 
         if solution is None:
-            # Fail closed to the existing one-step optimizer if the planning
+            # Fall back to the incumbent one-step optimizer if the planning
             # solver cannot return a usable plan.
             return super().assign(scenario, t)
 
