@@ -1,11 +1,11 @@
 # AegisSwarm — Current Research Status
 
 **Updated:** 2026-08-17  
-**Architecture status:** RELIABILITY EXECUTOR SCREEN COMPLETE; STOCHASTIC-ROBUST TRAINING IS NEXT  
-**Active branch:** `agent/reliability-aware-assignment`  
-**Completed protocol:** `aegisswarm-reliability-aware-screen-v1`
+**Architecture status:** STOCHASTIC-ROBUST TRAINING V1 ACTIVE; NOT FROZEN FOR EXTERNAL CLAIMS  
+**Active branch:** `agent/stochastic-robust-training`  
+**Active protocol:** `aegisswarm-stochastic-robust-training-v1`
 
-Read `docs/AEGISSWARM_SKILL.md` for long-form history, `EVIDENCE_HARDENING.md` for Simulator V2 headroom evidence, and `RELIABILITY_AWARE.md` for the completed executor screen.
+Read `docs/AEGISSWARM_SKILL.md` for long-form history, `EVIDENCE_HARDENING.md` for Simulator V2 headroom evidence, `RELIABILITY_AWARE.md` for the completed executor screen, and `STOCHASTIC_ROBUST.md` for the active protocol.
 
 ## Incumbent architecture
 
@@ -15,11 +15,11 @@ Read `docs/AEGISSWARM_SKILL.md` for long-form history, `EVIDENCE_HARDENING.md` f
 + one-step RuleGuidedHungarianPolicy executor
 ```
 
-The incumbent is not replaced by the reliability screen.
+The incumbent is not replaced by the reliability-aware executor screen.
 
-## Why stochastic reliability is the main bottleneck
+## Evidence that motivates the active protocol
 
-Evidence-hardening development on fresh Simulator V2 seeds `17000–17399` found:
+### Simulator V2 headroom — `17000–17399`
 
 ```text
 incumbent v2 normal:              0.801
@@ -30,11 +30,9 @@ sensing headroom:                -0.0005 CI=[-0.00225, 0.0]
 interaction headroom:            +0.1980 CI=[0.166, 0.23625]
 ```
 
-Normal program-scenario episodes averaged `15.661` failed real interaction attempts and exhausted abstract uses in `85.15%` of episodes. Undetected penetrations were zero. The deterministic-success result is a loose counterfactual diagnostic, not an attainable-policy or mathematical upper-bound claim.
+The deterministic-success result is a loose counterfactual diagnostic, not an attainable-policy or mathematical upper-bound claim. Normal episodes averaged `15.661` failed real interaction attempts and exhausted abstract uses in `85.15%` of program-scenario episodes.
 
-## Reliability-aware executor screen — COMPLETE
-
-Fresh development block `19000–19399`, five frozen incumbent programs, Simulator V2 indexed randomness:
+### Reliability-aware executor screen — `19000–19399`
 
 ```text
 incumbent survival:               0.809
@@ -43,43 +41,111 @@ contingent-backup survival:       0.825
 weighted - incumbent:            +0.0003 CI=[-0.0165, +0.01775]
 backup - incumbent:              +0.0155 CI=[-0.00625, +0.03575625]
 backup - weighted:               +0.0152 CI=[-0.00825, +0.0375]
-per-program weighted deltas:      [+0.0050, -0.0125, +0.00125, +0.00875, -0.00125]
 per-program backup deltas:        [-0.0025, +0.0250, +0.0200, +0.02875, +0.00625]
-resources consumed inc/wgt/bak:   31.492 / 31.494 / 31.547
-real interaction failures:        15.422 / 15.460 / 15.908
 runtime inc/wgt/bak:              0.0218s / 0.0219s / 0.0450s
 ```
 
-### Decision
+Decision:
 
-1. **Reliability-weighted Hungarian is effectively a null result.** The full-screen point estimate is only `+0.03` percentage points and the interval is centered on zero. Do not pursue weighting-only variants.
-2. **Contingent backup is a weak positive, not an established win.** Its point estimate is `+1.55` pp, four of five program-level effects are positive, but the hierarchical interval crosses zero and runtime is about 2x the incumbent.
-3. Do **not** consume `20000–20399` confirmation. The executor has not earned a freeze.
-4. Do **not** declare backup the incumbent or launch a confirmation campaign.
-5. The executor experiment captures only a small fraction of the `+19.8` pp interaction headroom. The next hypothesis should therefore operate at the training/objective level rather than add more one-step assignment heuristics.
+- reliability weighting is effectively a null result;
+- contingent backup is only a weak positive and does not earn confirmation;
+- do not inspect `20000–20399`;
+- do not declare backup the incumbent;
+- stop one-step executor micro-tuning by default.
 
-## Next experiment — stochastic-robust strategy training
+## Active experiment — stochastic-robust strategy training V1
 
-The current 60-token programs were discovered under the legacy simulator, where each candidate sees one stochastic realization per training scenario. That is misaligned with the Simulator V2 evidence: stochastic interaction outcomes are the dominant measured loss source.
+Question:
 
-Next question:
+> Holding the 60-token representation, local/evolutionary search family and scalar score fixed, does evaluating each candidate across multiple matched Simulator V2 random tapes per structural scenario produce strategies that generalize better under stochastic interaction outcomes?
 
-> Holding the 60-token representation and conventional local/evolutionary search family fixed, does training each candidate across multiple policy-independent Simulator V2 random tapes per scenario produce strategies that generalize better under stochastic interaction outcomes?
+### What changes
 
-The next protocol should:
+Only the stochastic training distribution:
 
-- keep scenario geometry and random-tape seeds separate;
-- evaluate every candidate on the same matched random tapes (common random numbers);
-- average the existing scalar fitness over repeated tapes; do not introduce a CVaR/risk-weight hyperparameter in the first version;
-- compare robust training with the incumbent executor against robust training with contingent backup under the same candidate budget and tape bundle;
-- retain the old frozen incumbent programs as a reference only;
-- use fresh training/development/confirmation seeds because the protocol is motivated by inspected `17000–17399` and `19000–19399` results.
+- structural scenario/world seed is separated from random-tape seed;
+- every candidate in both training arms sees the same world×tape bundle;
+- metrics are averaged across replications before applying the established scalar fitness.
 
-No Axplorer/proposer comparison is needed in this first robust-training experiment; local/evolutionary search is the strongest established search baseline.
+V1 does **not** add CVaR, a risk coefficient, new rule tokens, Axplorer, a planning horizon, or a new interaction model.
+
+### Paired training arms
+
+1. `robust_local_incumbent` — search through `RuleGuidedHungarianPolicy`;
+2. `robust_local_backup` — search through `ReliabilityAwareBackupPolicy`.
+
+Both use the same search seeds, initial search mechanics, candidate budget, structural worlds and random tapes.
+
+### 2×2 cross-evaluation
+
+Fresh evaluation runs both discovered program sets under both executors:
+
+```text
+incumbent-trained program × incumbent executor
+incumbent-trained program × backup executor
+backup-trained program    × incumbent executor
+backup-trained program    × backup executor
+```
+
+This separates program adaptation, executor effect and co-adaptation.
+
+The five old frozen incumbent programs are reported under both executors as descriptive references only; they were trained under a different simulator generation/protocol.
+
+## Quick protocol — run first
+
+```text
+paired search runs:      2
+candidate budget:        128 per arm/run
+training worlds:         4
+random tapes/world:      2
+rollouts/candidate:      8
+evaluation:              22000–22019
+```
+
+```bash
+python -m aegisswarm.stochastic_robust_cli --workers 14
+```
+
+Do **not** run `--full` until the quick output is inspected.
+
+## Full development protocol — only if quick passes
+
+```text
+paired search runs:      5
+candidate budget:        1800 per arm/run
+training worlds:         12
+random tapes/world:      3
+rollouts/candidate:      36
+development evaluation:  22000–22399
+```
+
+Reserved confirmation: `23000–23399` — **do not inspect during development**.
+
+Training structural-world pool: `21000–21031`; full V1 uses the first 12.
+
+## Decision gate
+
+### Robust incumbent training improves
+
+Repeated-tape training itself is useful. Keep incumbent execution unless backup adds a clear incremental effect.
+
+### Co-adapted robust backup improves materially
+
+Training and contingent execution are complementary; this becomes a candidate architecture for a later frozen protocol.
+
+### Both robust arms tie old frozen references
+
+Mean replicated training does not capture the remaining stochastic headroom. A later explicit tail-risk/CVaR objective becomes more justified than further executor tweaking.
+
+### Both worsen
+
+Close V1 and retain the incumbent.
+
+No confirmation is authorized by quick evidence or an ambiguous development result.
 
 ## Secondary future track
 
-The best-of-5 frozen-program oracle reached `0.938`, a `+13.62` pp gap over mean incumbent performance. Context-dependent strategy selection remains a justified secondary experiment, but it follows stochastic-robust training because the interaction-reliability headroom is larger and more directly diagnosed.
+The best-of-5 frozen-program oracle reached `0.938`, a `+13.62` pp gap over mean incumbent performance. Context-dependent strategy selection remains a justified secondary experiment after this robust-training test.
 
 ## Evidence ledger
 
@@ -97,7 +163,7 @@ Consumed development/evidence includes:
 - `17000–17399`: evidence-hardening/headroom development
 - `19000–19399`: reliability-aware executor development
 
-Untouched reserved blocks tied to older protocols must not be silently repurposed:
+Untouched reserved blocks tied to older protocols must not be repurposed:
 
 - `6000–6399`
 - `7000–7399`
@@ -107,7 +173,13 @@ Untouched reserved blocks tied to older protocols must not be silently repurpose
 - `14000–14399`
 - `16000–16399`
 - `18000–18399`
-- `20000–20399` — reliability-aware confirmation; **do not run**
+- `20000–20399`
+
+Current robust protocol:
+
+- `21000–21031`: training structural worlds
+- `22000–22399`: development evaluation
+- `23000–23399`: reserved confirmation
 
 ## Claims policy
 
@@ -124,6 +196,7 @@ Supported development-level conclusions:
 
 Not supported:
 
+- stochastic-robust training superiority before the active experiment runs;
 - deterministic interaction success as attainable;
 - contingent-backup executor superiority;
 - superiority to optimization or RL generally;
