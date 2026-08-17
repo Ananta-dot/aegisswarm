@@ -14,28 +14,84 @@ from .scoring import EvalConfig
 from .simulator import Simulator
 
 
+# V2 is deliberately still compact, but it is now a smooth optimizer-facing
+# analogue of the state-reactive rule policy rather than a zero-centred utility
+# model. The exact assignment remains the responsibility of Hungarian matching.
 PARAM_NAMES = (
     "urgency_weight",
     "asset_value_weight",
-    "fast_weight",
-    "direct_weight",
-    "decoy_weight",
-    "distance_weight",
-    "resource_scarcity_weight",
+    "fast_modifier",
+    "direct_modifier",
+    "decoy_modifier",
+    "distance_closeness_weight",
+    "capacity_weight",
+    "resource_scarcity_penalty",
     "reserve_threshold",
+    "release_urgency_threshold",
     "stickiness_weight",
     "speed_weight",
+    "target_damage_weight",
+    "urgency_scarcity_weight",
 )
 OBJECTIVE_DIM = len(PARAM_NAMES)
 
-LOWER_BOUNDS = np.asarray([0.0, 0.0, -1.0, -1.0, -4.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-UPPER_BOUNDS = np.asarray([8.0, 4.0, 4.0, 4.0, 1.0, 4.0, 4.0, 0.8, 4.0, 4.0])
+LOWER_BOUNDS = np.asarray(
+    [
+        0.0,   # urgency
+        0.0,   # asset value
+        -2.0,  # fast modifier
+        -2.0,  # direct modifier
+        -5.0,  # decoy modifier
+        0.0,   # defender/threat closeness
+        0.0,   # defender capacity
+        0.0,   # scarcity penalty
+        0.0,   # reserve threshold
+        0.30,  # release urgency threshold
+        0.0,   # stickiness
+        0.0,   # speed
+        0.0,   # target asset damage
+        -2.0,  # urgency x scarcity interaction
+    ],
+    dtype=float,
+)
+UPPER_BOUNDS = np.asarray(
+    [
+        6.0,
+        4.0,
+        4.0,
+        4.0,
+        1.0,
+        4.0,
+        3.0,
+        4.0,
+        0.80,
+        1.00,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+    ],
+    dtype=float,
+)
 
-# Diagnostic/default vector for smoke tests and direct policy use. It is NOT
-# injected into the representation-search population; both searched
-# representations begin from stochastic candidates under matched search seeds.
+# Used for tests/inspection only. Search does NOT receive this as a warm start.
 DEFAULT_NATIVE_OBJECTIVE = np.asarray(
-    [3.0, 1.0, 1.0, 0.8, -1.5, 1.5, 1.0, 0.20, 0.5, 0.5],
+    [
+        1.0,
+        0.5,
+        0.4,
+        0.2,
+        -1.0,
+        0.5,
+        0.2,
+        0.5,
+        0.15,
+        0.75,
+        0.2,
+        0.2,
+        0.5,
+        0.5,
+    ],
     dtype=float,
 )
 
@@ -54,7 +110,7 @@ def random_objective(rng: np.random.Generator) -> np.ndarray:
 def mutate_objective(vector, rng: np.random.Generator, scale: float = 0.12) -> np.ndarray:
     base = canonicalize_objective(vector)
     width = UPPER_BOUNDS - LOWER_BOUNDS
-    mask = rng.random(OBJECTIVE_DIM) < 0.45
+    mask = rng.random(OBJECTIVE_DIM) < 0.40
     if not np.any(mask):
         mask[int(rng.integers(0, OBJECTIVE_DIM))] = True
     noise = rng.normal(0.0, float(scale), size=OBJECTIVE_DIM) * width
@@ -67,20 +123,29 @@ def crossover_objective(a, b, rng: np.random.Generator) -> np.ndarray:
     a = canonicalize_objective(a)
     b = canonicalize_objective(b)
     alpha = rng.uniform(0.0, 1.0, size=OBJECTIVE_DIM)
-    child = alpha * a + (1.0 - alpha) * b
-    return canonicalize_objective(child)
+    return canonicalize_objective(alpha * a + (1.0 - alpha) * b)
+
+
+def _type_prior(threat) -> float:
+    if threat.threat_type == ThreatType.FAST:
+        return 1.25
+    if threat.threat_type == ThreatType.DIRECT:
+        return 1.0
+    return 0.2
 
 
 class OptimizerNativePolicy(Policy):
-    """Compact strategic objective + exact per-step assignment.
+    """Continuous strategic objective + exact per-step assignment.
 
-    The vector controls abstract utility terms. Feasibility and one-to-one
-    assignment remain the responsibility of the Hungarian optimizer.
+    V2 deliberately inherits the same always-positive structural base utility as
+    RuleGuidedHungarianPolicy. Search then learns smooth state modifiers. This
+    prevents the representation experiment from degenerating into learning that
+    reachable threats should receive any positive utility at all.
     """
 
-    name = "optimizer_native"
+    name = "optimizer_native_v2"
 
-    def __init__(self, vector, name="optimizer_native"):
+    def __init__(self, vector, name="optimizer_native_v2"):
         self.vector = canonicalize_objective(vector)
         self.name = name
 
@@ -92,10 +157,20 @@ class OptimizerNativePolicy(Policy):
         asset = next(a for a in scenario.assets if a.id == threat.target_asset_id)
         d_asset = distance_to_target(scenario, threat)
 
+        # Exact structural base used by the rule-guided Hungarian policy.
+        base = (
+            2.0 * _type_prior(threat)
+            + 1.5 / max(d_asset, 1.0)
+            + 1.0 / max(d_def, 1.0)
+        )
+
         urgency = 1.0 - min(d_asset / max(scenario.world_size, 1.0), 1.0)
         max_asset_value = max((a.value for a in scenario.assets), default=1.0)
         asset_value = asset.value / max(max_asset_value, 1e-9)
         distance_closeness = 1.0 - min(d_def / max(defender.range, 1e-9), 1.0)
+
+        max_capacity = max((d.capacity for d in scenario.defenders), default=1.0)
+        capacity = defender.capacity / max(max_capacity, 1e-9)
 
         initial_total = float(scenario.metadata.get("initial_defender_uses", 0.0))
         if initial_total > 0.0:
@@ -103,13 +178,18 @@ class OptimizerNativePolicy(Policy):
         else:
             initial_per_defender = max(float(defender.remaining_uses), 1.0)
         resource_fraction = float(
-            np.clip(defender.remaining_uses / max(initial_per_defender, 1e-9), 0.0, 1.0)
+            np.clip(
+                defender.remaining_uses / max(initial_per_defender, 1e-9),
+                0.0,
+                1.0,
+            )
         )
         scarcity = 1.0 - resource_fraction
 
         max_speed = max((th.speed for th in scenario.threats if th.active), default=1.0)
         speed = threat.speed / max(max_speed, 1e-9)
         sticky = 1.0 if defender.assigned_threat_id == threat.id else 0.0
+        target_damage = float(np.clip(asset.damage / max(asset.value, 1e-9), 0.0, 1.0))
 
         (
             w_urgency,
@@ -118,33 +198,44 @@ class OptimizerNativePolicy(Policy):
             w_direct,
             w_decoy,
             w_distance,
+            w_capacity,
             w_scarcity,
             reserve_threshold,
+            release_urgency_threshold,
             w_sticky,
             w_speed,
+            w_damage,
+            w_urgency_scarcity,
         ) = self.vector
 
-        # Reserve is a strategic gate, not a feasibility constraint. Urgent
-        # threats can still release reserved capacity automatically.
-        if resource_fraction <= reserve_threshold and urgency < 0.75:
+        # Smooth/native analogue of RESERVE + RELEASE_RESERVE. Setting the
+        # reserve threshold to zero effectively disables the gate.
+        if (
+            resource_fraction <= reserve_threshold
+            and urgency < release_urgency_threshold
+        ):
             return None
 
-        type_term = 0.0
+        type_modifier = 0.0
         if threat.threat_type == ThreatType.FAST:
-            type_term = w_fast
+            type_modifier = w_fast
         elif threat.threat_type == ThreatType.DIRECT:
-            type_term = w_direct
+            type_modifier = w_direct
         elif threat.threat_type == ThreatType.DECOY:
-            type_term = w_decoy
+            type_modifier = w_decoy
 
         utility = (
-            w_urgency * urgency
+            base
+            + w_urgency * urgency
             + w_asset * asset_value
-            + type_term
+            + type_modifier
             + w_distance * distance_closeness
+            + w_capacity * capacity
             - w_scarcity * scarcity
             + w_sticky * sticky
             + w_speed * speed
+            + w_damage * target_damage
+            + w_urgency_scarcity * urgency * scarcity
         )
         return float(utility)
 
@@ -191,7 +282,12 @@ def evaluate_native_objective(vector, config: EvalConfig):
             fast_fraction=config.fast_fraction,
             sensor_quality=config.sensor_quality,
         )
-        rows.append(Simulator.evaluate_policy(scenario, OptimizerNativePolicy(vector)).as_dict())
+        rows.append(
+            Simulator.evaluate_policy(
+                scenario,
+                OptimizerNativePolicy(vector),
+            ).as_dict()
+        )
 
     survival = float(np.mean([r["asset_survival_rate"] for r in rows]))
     containment = float(np.mean([r["containment_rate"] for r in rows]))
@@ -287,7 +383,11 @@ class NativeBudgetedOracle:
                     seen.add(key)
                     keys.append(key)
         ranked = [
-            (float(self.cache[key]["fitness"]), np.asarray(key, dtype=float), self.cache[key])
+            (
+                float(self.cache[key]["fitness"]),
+                np.asarray(key, dtype=float),
+                self.cache[key],
+            )
             for key in keys
         ]
         ranked.sort(key=lambda item: item[0], reverse=True)
@@ -305,6 +405,8 @@ def train_native_local(
 ):
     rng = np.random.default_rng(int(search_seed))
     population = int(population)
+    # No hand-written warm start: this remains a fair representation/search
+    # comparison against the stochastic rule-program search.
     vectors = [random_objective(rng) for _ in range(population)]
     started = time.perf_counter()
     history = []
@@ -325,7 +427,7 @@ def train_native_local(
                 a = elites[int(rng.integers(0, len(elites)))]
                 b = elites[int(rng.integers(0, len(elites)))]
                 child = crossover_objective(a, b, rng)
-                children.append(mutate_objective(child, rng, scale=0.12))
+                children.append(mutate_objective(child, rng, scale=0.10))
             before = oracle.evaluations
             oracle.evaluate_many(children)
             pool.extend(children)
@@ -334,16 +436,24 @@ def train_native_local(
                 if oracle.remaining <= 0:
                     break
                 top = oracle.rank(pool)[:elite_n]
-                neighbors = [mutate_objective(v, rng, scale=0.06) for _, v, _ in top]
+                neighbors = [
+                    mutate_objective(v, rng, scale=0.04)
+                    for _, v, _ in top
+                ]
                 oracle.evaluate_many(neighbors)
                 pool.extend(neighbors)
 
             vectors = [v.copy() for _, v, _ in oracle.rank(pool)[:population]]
             if oracle.evaluations == before and oracle.remaining > 0:
-                fresh = [random_objective(rng) for _ in range(min(population, oracle.remaining))]
+                fresh = [
+                    random_objective(rng)
+                    for _ in range(min(population, oracle.remaining))
+                ]
                 oracle.evaluate_many(fresh)
                 vectors.extend(fresh)
-                vectors = [v.copy() for _, v, _ in oracle.rank(vectors)[:population]]
+                vectors = [
+                    v.copy() for _, v, _ in oracle.rank(vectors)[:population]
+                ]
 
             _, best, metrics = oracle.rank()[0]
             row = {
@@ -359,9 +469,10 @@ def train_native_local(
             history.append(row)
             if verbose:
                 print(
-                    f"[native-local seed={search_seed}] round={round_index} "
+                    f"[native-v2-local seed={search_seed}] round={round_index} "
                     f"evals={oracle.evaluations}/{oracle_budget} "
-                    f"fitness={row['fitness']:.3f} survival={row['asset_survival_rate']:.3f}",
+                    f"fitness={row['fitness']:.3f} "
+                    f"survival={row['asset_survival_rate']:.3f}",
                     flush=True,
                 )
             round_index += 1
@@ -369,7 +480,7 @@ def train_native_local(
         _, best, metrics = oracle.rank()[0]
 
     return {
-        "method": "optimizer_native_local",
+        "method": "optimizer_native_local_v2",
         "search_seed": int(search_seed),
         "best_objective": [float(x) for x in best],
         "parameter_names": list(PARAM_NAMES),
