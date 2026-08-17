@@ -6,16 +6,17 @@ Read in order before changing algorithms, protocols, seeds, or claims:
 
 1. `docs/AEGISSWARM_SKILL.md` — long-form history.
 2. `docs/AEGISSWARM_STATUS.md` — latest-state overlay; supersedes older current wording.
-3. `STRATEGY_SELECTOR.md` — active selector protocol.
-4. `STOCHASTIC_TRAINING_ABLATION.md` — closed repeated-tape V2.
-5. `STOCHASTIC_ROBUST.md` — closed robust-training V1.
-6. `EVIDENCE_HARDENING.md` — completed Simulator V2/headroom protocol.
-7. `RELIABILITY_AWARE.md` — completed reliability-executor screen.
-8. `ROLLING_HORIZON.md` — completed planner history.
+3. `ORACLE_DECOMPOSITION.md` — active diagnostic.
+4. `STRATEGY_SELECTOR.md` — closed selector V1.
+5. `STOCHASTIC_TRAINING_ABLATION.md` — closed repeated-tape V2.
+6. `STOCHASTIC_ROBUST.md` — closed robust-training V1.
+7. `EVIDENCE_HARDENING.md` — completed Simulator V2/headroom protocol.
+8. `RELIABILITY_AWARE.md` — completed reliability-executor screen.
+9. `ROLLING_HORIZON.md` — completed planner history.
 
 ## Non-negotiable rules
 
-1. Never consume reserved confirmation seeds for development.
+1. Never consume reserved confirmation/replication seeds for development without an explicit protocol decision.
 2. Once inspected, a block is never untouched again.
 3. Do not silently change simulator/scoring/budgets inside a protocol.
 4. Compare components by ablation, not ideology.
@@ -25,7 +26,6 @@ Read in order before changing algorithms, protocols, seeds, or claims:
 8. Keep handoff/status docs current after major experiments.
 9. Do not run confirmation merely because a quick or development point estimate is positive.
 10. Legacy `Simulator` and `SimulatorV2` are different protocol generations; label them explicitly.
-11. Selector features must never expose undetected threat state, scenario seed, future outcomes or oracle information.
 
 ## Current incumbent
 
@@ -35,9 +35,9 @@ Read in order before changing algorithms, protocols, seeds, or claims:
 + one-step RuleGuidedHungarianPolicy
 ```
 
-No tested proposer, compact representation, planner, reliability executor, or repeated-tape training scheme has robustly replaced it.
+No tested proposer, compact representation, planner, reliability executor, repeated-tape training scheme, or t=0 observable selector has robustly replaced it.
 
-## Evidence that matters now
+## Completed evidence that matters now
 
 Simulator V2 headroom on `17000–17399`:
 
@@ -46,63 +46,70 @@ normal mean:                  0.801
 perfect sensing:             0.801
 deterministic interactions:  0.999
 best-of-5 frozen oracle:     0.938
-program survivals:           [0.7438,0.8313,0.8063,0.8150,0.8100]
 ```
 
-The oracle is about `+10.7 pp` above the strongest fixed frozen program on that block, motivating strategy selection. It is non-deployable hindsight.
-
-Reliability executor on `19000–19399`: weighting null; backup `+1.55 pp` with CI crossing zero. Do not inspect `20000–20399`.
+Reliability executor on `19000–19399`: weighting null; backup only `+1.55 pp` with CI crossing zero. Do not inspect `20000–20399`.
 
 Stochastic-robust V1 quick: co-adapted backup minus incumbent `-8.75 pp`; V1 closed. Do not inspect `23000–23399`.
 
-Clean stochastic-training V2 quick:
+Clean stochastic-training V2 quick: repeated minus single `-6.25 pp`, both paired runs negative. Do not inspect `26000–26399`.
+
+Observable selector V1 full development on `28000–28399`:
 
 ```text
-single tape:       0.787
-repeated tape:     0.725
-repeated-single:  -0.0625 CI=[-0.200,+0.050]
-per-run deltas:   [-0.100,-0.025]
+fixed best:             0.8275
+selector:               0.8113
+selector-fixed:        -0.0163 CI=[-0.0350,+0.0025]
+selector-fixed reward: -2.960 CI=[-5.3340,-0.6094]
+raw hindsight oracle:   0.9338
 ```
 
-V2 closed. Do not inspect `26000–26399`.
+Selector V1 is closed. Do not inspect `29000–29399` and do not tune selector features/models on that block by default.
 
-## Active phase — observable strategy selector V1
+## Active phase — oracle decomposition V1
 
-Branch: `agent/strategy-selector`  
-Protocol: `aegisswarm-observable-strategy-selector-v1`
+Branch: `agent/oracle-decomposition`  
+Protocol: `aegisswarm-oracle-decomposition-v1`
 
-Frozen policy set: the same five incumbent 60-token programs.
+The raw best-of-5 oracle is not assumed to be predictable strategy specialization. `SimulatorV2` interaction draws are indexed by `(timestep, defender_id, threat_id)`, so different programs encounter different stochastic event paths. Same-realization hindsight can therefore reward stochastic luck.
 
-Selector timing:
+No policy is trained or changed in this phase.
+
+Fresh structural-world blocks:
+
+- `30000–30399`: oracle-decomposition development
+- `31000–31399`: reserved independent replication — **do not inspect during development**
+
+Quick protocol:
 
 ```text
-SimulatorV2 t=0 sensing
-    -> observable feature snapshot
-    -> choose one frozen program
-    -> commit for episode
+20 worlds: 30000–30019
+4 indexed tapes/world
+5 frozen programs
 ```
 
-Allowed features use detected threats plus known assets/defenders/sensors/resources. Undetected threat state is forbidden and tested for leakage.
+Primary diagnostic: symmetric cross-tape oracle. Select the best program per structural world on one half of the tapes, evaluate it on the held-out half, then reverse. Compare against a global fixed program selected/evaluated with the same cross-tape split.
 
-V1 model: five fixed ridge reward regressors (`alpha=1.0`, untuned). Each predicts the established scalar episode reward of one frozen program from the t=0 observable feature vector.
+Report:
 
-Primary comparator: the best globally fixed frozen program selected on selector-training data. Do not compare primarily against the mean of five programs.
-
-Development oracle: best-of-5 in hindsight on the fresh evaluation block; report as headroom only.
-
-Fresh blocks:
-
-- `27000–27399`: selector training
-- `28000–28399`: selector development
-- `29000–29399`: selector confirmation — **do not inspect**
-
-Quick uses `27000–27099` training and `28000–28019` evaluation.
+- single-tape hindsight oracle gap;
+- expected-outcome same-tape oracle gap;
+- cross-tape oracle gap — primary;
+- first-half vs second-half best-program agreement;
+- modal stability of tape-specific oracle choices;
+- fraction of raw oracle gap retained cross-tape.
 
 Run only:
 
 ```bash
 pytest -q
-python -m aegisswarm.strategy_selector_cli --workers 14
+python -m aegisswarm.oracle_decomposition_cli --workers 14
 ```
 
 Do not use `--full` until quick output is inspected.
+
+## Interpretation
+
+- Large positive cross-tape gap + stable choices: genuine structural specialization; richer/later-state gating may be justified.
+- Raw oracle large but cross-tape gap near zero: most apparent headroom is stochastic hindsight; stop treating ~93–94% as a realistic selector target.
+- Cross-tape oracle below fixed: per-world strategy identity is unstable; prefer robust/global or sequentially adaptive control rather than episode-level preselection.
