@@ -7,7 +7,7 @@
 
 Read `docs/AEGISSWARM_SKILL.md` for full history. This file is the latest-state overlay.
 
-## Latest completed experiment — optimizer-native V2
+## Latest completed architecture result — optimizer-native V2
 
 Fresh development seeds `11000–11399`:
 
@@ -65,25 +65,49 @@ Default screen settings:
 - per-solve time limit: 0.25 s;
 - source strategies: `artifacts/optimizer_native_v2_dev/runs/rule_objective_seed_44001..44005.json`.
 
+### Quick screen — PASSED AS A DEVELOPMENT GATE
+
+Quick screen on planning-development seeds `13000–13019`:
+
+```text
+fixed_optimizer survival: 0.300
+rule_one_step survival:   0.820 CI=[0.700, 0.910]
+rule_rolling survival:    0.830 CI=[0.730, 0.915]
+rolling - one_step:       +0.0100 CI=[-0.090, +0.100125]
+paired p-value:           0.883656
+runtime one-step/rolling: 0.0130 s / 0.1866 s
+```
+
+Interpretation:
+
+1. This is a 20-scenario integration/development screen, not evidence of superiority.
+2. The rolling-horizon planner is **not pathologically worse** than one-step execution and has a small positive survival point estimate (+1 pp).
+3. The interval is far too wide and p-value far too large to infer a performance advantage.
+4. Rolling-horizon execution is substantially slower than one-step execution, but absolute runtime remains sub-second in this synthetic screen, so runtime does not yet kill the hypothesis.
+5. The planning hypothesis therefore **passes the quick gate** and justifies the full 400-scenario development screen before any planner-aware retraining.
+
 ## Fresh planning evidence
 
-- `13000–13399`: planning development;
+- `13000–13399`: planning development; first 20 seeds are now inspected development data;
 - `14000–14399`: reserved planning confirmation — **do not inspect**.
-
-Quick screen uses `13000–13019`; those seeds are development data as soon as inspected.
 
 ## Immediate runbook
 
+The next command is the full fixed-policy planning screen:
+
 ```bash
-git checkout agent/rolling-horizon-planning
-git pull origin agent/rolling-horizon-planning
-pytest -q
-python -m aegisswarm.rolling_horizon_cli --workers 5
+python -m aegisswarm.rolling_horizon_cli --full --workers 5
 ```
 
-Do not run `--full` yet. First inspect quick survival, paired difference, and runtime.
+This is still a screening ablation with frozen existing rule programs. It does **not** retrain strategies through the planner.
 
-If the screen is promising, the next formal architecture stage is **planner-aware rule training**: retrain the same 60-token representation through the rolling-horizon executor under matched search seeds and candidate-evaluation budgets, using planning development data only.
+After the 400-scenario result:
+
+- if rolling horizon produces a meaningful positive effect without unacceptable runtime/resource tradeoffs, build a new **planner-aware rule-training protocol** using fresh development/confirmation blocks and matched candidate-evaluation budgets;
+- if it is essentially tied, inspect penetrations, damage, resource consumption and runtime before deciding whether planner-aware training is worth one formal attempt;
+- if it is materially worse, diagnose the planning formulation once and then prefer the one-step executor rather than blindly increasing horizon/complexity.
+
+Do not consume `14000–14399` during this screening stage.
 
 ## Evidence ledger
 
@@ -95,7 +119,8 @@ Consumed:
 - `4000–4399`: hybrid-executor development;
 - `5000–5399`: hybrid-objective development;
 - `9000–9399`: optimizer-native V1 development;
-- `11000–11399`: optimizer-native V2 development.
+- `11000–11399`: optimizer-native V2 development;
+- `13000–13019`: rolling-horizon quick development subset.
 
 Untouched older reserved blocks, each tied to an older unfrozen/abandoned protocol:
 
@@ -117,7 +142,8 @@ Supported development-level claims:
 - optimizer-aware searched rule strategies strongly outperform the current fixed hand-written myopic objective in this synthetic simulator;
 - Axplorer did not materially outperform local/evolutionary search under the matched hybrid-objective protocol;
 - optimizer-native V2 was 11.2 percentage points worse than the 60-token rule representation on fresh development data;
-- the 60-token rule representation is the strongest strategic representation tested so far.
+- the 60-token rule representation is the strongest strategic representation tested so far;
+- a 20-scenario rolling-horizon quick screen completed successfully with survival in the same regime as one-step rule-guided execution, justifying a larger development screen.
 
 Not yet supported:
 
