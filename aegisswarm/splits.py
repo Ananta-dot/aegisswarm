@@ -25,15 +25,21 @@ EVIDENCE_CONFIRM_SEEDS = tuple(range(18000, 18400))
 RELIABILITY_DEV_SEEDS = tuple(range(19000, 19400))
 RELIABILITY_CONFIRM_SEEDS = tuple(range(20000, 20400))
 
-# Stochastic-robust training uses fresh structural worlds distinct from all prior
-# development/evidence blocks. These seeds are training data, not holdout evidence.
+# Stochastic-robust V1. Quick inspection consumed training worlds 21000-21003
+# and evaluation scenarios 22000-22019. The V1 architecture is closed after
+# the quick screen; do not silently reuse the remainder of these blocks as
+# unseen evidence for a changed protocol.
 ROBUST_TRAIN_WORLD_SEEDS = tuple(range(21000, 21032))
-
-# Fresh development evaluation for the robust-training architecture.
 ROBUST_DEV_SEEDS = tuple(range(22000, 22400))
-
-# Reserved robust-training confirmation. Do not inspect during development.
 ROBUST_CONFIRM_SEEDS = tuple(range(23000, 23400))
+
+# Stochastic-training ablation V2. This cleanly isolates repeated random-tape
+# training from single-tape SimulatorV2 training while holding the executor,
+# representation, search family, structural worlds, search seeds and candidate
+# budget fixed.
+STOCHASTIC_ABLATION_TRAIN_WORLD_SEEDS = tuple(range(24000, 24032))
+STOCHASTIC_ABLATION_DEV_SEEDS = tuple(range(25000, 25400))
+STOCHASTIC_ABLATION_CONFIRM_SEEDS = tuple(range(26000, 26400))
 
 SPLITS = {
     "train": TRAIN_SEEDS,
