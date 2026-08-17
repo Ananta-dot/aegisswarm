@@ -12,10 +12,7 @@ from .evidence_hardening import load_incumbent_programs
 from .final_proof import METRICS, paired_hierarchical_bootstrap, summarize_method
 from .hybrid import RuleGuidedHungarianPolicy
 from .hybrid_ablation import SCENARIO_KWARGS
-from .reliability import (
-    ReliabilityAwareBackupPolicy,
-    ReliabilityWeightedHungarianPolicy,
-)
+from .reliability import ReliabilityAwareBackupPolicy, ReliabilityWeightedHungarianPolicy
 from .scenarios import ScenarioGenerator
 from .simulator_v2 import SimulatorV2
 from .splits import RELIABILITY_DEV_SEEDS
@@ -64,12 +61,7 @@ def _evaluate_worker(payload):
 def evaluate_programs(mode, programs, seeds, workers=1, scenario_kwargs=None):
     scenario_kwargs = dict(scenario_kwargs or SCENARIO_KWARGS)
     payloads = [
-        (
-            mode,
-            [int(x) for x in program],
-            [int(s) for s in seeds],
-            scenario_kwargs,
-        )
+        (mode, [int(x) for x in program], [int(s) for s in seeds], scenario_kwargs)
         for program in programs
     ]
 
@@ -130,6 +122,16 @@ def _diagnostic_mean(evaluation, key):
     return float(np.mean(values)) if values else 0.0
 
 
+def _diagnostic_ratio(evaluation, numerator_key, denominator_key):
+    num = 0.0
+    den = 0.0
+    for run in evaluation.get("diagnostics_by_run", []):
+        for diag in run:
+            num += float(diag.get(numerator_key, 0.0))
+            den += float(diag.get(denominator_key, 0.0))
+    return float(num / den) if den > 0.0 else 0.0
+
+
 def run_reliability_screen(
     *,
     source_dir=DEFAULT_SOURCE_DIR,
@@ -159,6 +161,34 @@ def run_reliability_screen(
     backup_vs_incumbent = _compare(incumbent, backup, 192000)
     backup_vs_weighted = _compare(weighted, backup, 193000)
 
+    diagnostics = {}
+    for label, evaluation in (
+        ("incumbent", incumbent),
+        ("weighted", weighted),
+        ("backup", backup),
+    ):
+        attempts = _diagnostic_mean(evaluation, "real_interaction_attempts")
+        failures = _diagnostic_mean(evaluation, "real_interaction_failures")
+        diagnostics[f"{label}_real_interaction_attempts_mean"] = attempts
+        diagnostics[f"{label}_real_interaction_failures_mean"] = failures
+        diagnostics[f"{label}_real_interaction_failure_rate"] = _diagnostic_ratio(
+            evaluation,
+            "real_interaction_failures",
+            "real_interaction_attempts",
+        )
+        diagnostics[f"{label}_resource_exhausted_fraction"] = _diagnostic_mean(
+            evaluation,
+            "resource_exhausted",
+        )
+        diagnostics[f"{label}_penetrations_in_range_no_resource_mean"] = _diagnostic_mean(
+            evaluation,
+            "penetrations_in_range_no_resource",
+        )
+        diagnostics[f"{label}_penetrations_with_reachable_resource_mean"] = _diagnostic_mean(
+            evaluation,
+            "penetrations_with_reachable_resource",
+        )
+
     result = {
         "protocol_id": PROTOCOL_ID,
         "mode": "quick_development" if quick else "development_screen",
@@ -175,26 +205,7 @@ def run_reliability_screen(
         "per_program_survival_delta_backup_minus_incumbent": _per_program_delta(
             incumbent, backup
         ),
-        "diagnostics": {
-            "incumbent_real_interaction_failures_mean": _diagnostic_mean(
-                incumbent, "real_interaction_failures"
-            ),
-            "weighted_real_interaction_failures_mean": _diagnostic_mean(
-                weighted, "real_interaction_failures"
-            ),
-            "backup_real_interaction_failures_mean": _diagnostic_mean(
-                backup, "real_interaction_failures"
-            ),
-            "incumbent_resource_exhausted_fraction": _diagnostic_mean(
-                incumbent, "resource_exhausted"
-            ),
-            "weighted_resource_exhausted_fraction": _diagnostic_mean(
-                weighted, "resource_exhausted"
-            ),
-            "backup_resource_exhausted_fraction": _diagnostic_mean(
-                backup, "resource_exhausted"
-            ),
-        },
+        "diagnostics": diagnostics,
         "notes": [
             "All three variants use the same five frozen 60-token programs.",
             "Weighted mode preserves one-to-one Hungarian assignment and changes only pair scoring.",
@@ -234,26 +245,11 @@ def run_reliability_screen(
 
     print("\n=== RELIABILITY-AWARE ASSIGNMENT SCREEN ===", flush=True)
     print(f"incumbent survival:               {survival('incumbent'):.3f}", flush=True)
-    print(
-        f"reliability-weighted survival:    {survival('reliability_weighted'):.3f}",
-        flush=True,
-    )
-    print(
-        f"contingent-backup survival:       {survival('reliability_backup'):.3f}",
-        flush=True,
-    )
-    print(
-        f"weighted - incumbent:            {wi['second_minus_first']:+.4f} CI={wi['ci95']}",
-        flush=True,
-    )
-    print(
-        f"backup - incumbent:              {bi['second_minus_first']:+.4f} CI={bi['ci95']}",
-        flush=True,
-    )
-    print(
-        f"backup - weighted:               {bw['second_minus_first']:+.4f} CI={bw['ci95']}",
-        flush=True,
-    )
+    print(f"reliability-weighted survival:    {survival('reliability_weighted'):.3f}", flush=True)
+    print(f"contingent-backup survival:       {survival('reliability_backup'):.3f}", flush=True)
+    print(f"weighted - incumbent:            {wi['second_minus_first']:+.4f} CI={wi['ci95']}", flush=True)
+    print(f"backup - incumbent:              {bi['second_minus_first']:+.4f} CI={bi['ci95']}", flush=True)
+    print(f"backup - weighted:               {bw['second_minus_first']:+.4f} CI={bw['ci95']}", flush=True)
     print(
         "per-program weighted deltas:     "
         f"{result['per_program_survival_delta_weighted_minus_incumbent']}",
@@ -272,10 +268,31 @@ def run_reliability_screen(
         flush=True,
     )
     print(
+        "real attempts inc/wgt/bak:       "
+        f"{diagnostics['incumbent_real_interaction_attempts_mean']:.3f} / "
+        f"{diagnostics['weighted_real_interaction_attempts_mean']:.3f} / "
+        f"{diagnostics['backup_real_interaction_attempts_mean']:.3f}",
+        flush=True,
+    )
+    print(
         "interaction failures inc/wgt/bak: "
-        f"{result['diagnostics']['incumbent_real_interaction_failures_mean']:.3f} / "
-        f"{result['diagnostics']['weighted_real_interaction_failures_mean']:.3f} / "
-        f"{result['diagnostics']['backup_real_interaction_failures_mean']:.3f}",
+        f"{diagnostics['incumbent_real_interaction_failures_mean']:.3f} / "
+        f"{diagnostics['weighted_real_interaction_failures_mean']:.3f} / "
+        f"{diagnostics['backup_real_interaction_failures_mean']:.3f}",
+        flush=True,
+    )
+    print(
+        "failure rate inc/wgt/bak:        "
+        f"{diagnostics['incumbent_real_interaction_failure_rate']:.3f} / "
+        f"{diagnostics['weighted_real_interaction_failure_rate']:.3f} / "
+        f"{diagnostics['backup_real_interaction_failure_rate']:.3f}",
+        flush=True,
+    )
+    print(
+        "resource exhausted inc/wgt/bak:  "
+        f"{diagnostics['incumbent_resource_exhausted_fraction']:.3f} / "
+        f"{diagnostics['weighted_resource_exhausted_fraction']:.3f} / "
+        f"{diagnostics['backup_resource_exhausted_fraction']:.3f}",
         flush=True,
     )
     print(
