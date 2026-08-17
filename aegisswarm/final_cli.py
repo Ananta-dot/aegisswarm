@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 
 from .final_proof import run_final_proof
+from .final_runtime_patch import install_budgeted_oracle_patch
 
 
 def build_parser():
@@ -48,6 +49,11 @@ def main():
     out_dir = args.out_dir
     if out_dir is None:
         out_dir = "artifacts/final_proof_quick" if args.quick else "artifacts/final_proof"
+
+    # final_proof historically reused the same private worker name for two
+    # different process-pool jobs. Install the unambiguous spawn-safe candidate
+    # scorer before creating any pools.
+    install_budgeted_oracle_patch()
 
     run_final_proof(
         out_dir=out_dir,
