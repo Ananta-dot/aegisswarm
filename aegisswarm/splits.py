@@ -46,12 +46,19 @@ SELECTOR_TRAIN_SEEDS = tuple(range(27000, 27400))
 SELECTOR_DEV_SEEDS = tuple(range(28000, 28400))
 SELECTOR_CONFIRM_SEEDS = tuple(range(29000, 29400))
 
-# Oracle-decomposition diagnostic. These structural-world seeds are fresh because
-# the diagnostic was motivated after inspecting the failed selector development
-# result and recognizing that the raw hindsight oracle can benefit from
-# policy-specific stochastic interaction draws. This protocol changes no policy.
+# Oracle-decomposition diagnostic. Full development consumed 30000-30399.
+# The reserved replication block remains untouched; the diagnostic closed
+# episode-level frozen-program selection.
 ORACLE_DECOMP_DEV_SEEDS = tuple(range(30000, 30400))
 ORACLE_DECOMP_REPLICATION_SEEDS = tuple(range(31000, 31400))
+
+# Hierarchical PPO online-adaptation V1. This architecture is motivated only
+# after the full oracle decomposition showed that episode-level strategy choice
+# is unstable across stochastic outcomes. PPO training may inspect 32000-32999;
+# development uses fresh 33000-33399; 34000-34399 is reserved confirmation.
+PPO_TRAIN_SEEDS = tuple(range(32000, 33000))
+PPO_DEV_SEEDS = tuple(range(33000, 33400))
+PPO_CONFIRM_SEEDS = tuple(range(34000, 34400))
 
 SPLITS = {
     "train": TRAIN_SEEDS,
