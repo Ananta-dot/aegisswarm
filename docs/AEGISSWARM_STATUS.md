@@ -1,14 +1,13 @@
 # AegisSwarm — Current Research Status
 
 **Updated:** 2026-08-17  
-**Architecture status:** CURRENT INCUMBENT SELECTED FOR EVIDENCE HARDENING; NOT FROZEN FOR EXTERNAL CLAIMS  
-**Active branch:** `agent/evidence-hardening`  
-**Active protocol:** `aegisswarm-evidence-hardening-v1`  
-**Current decision:** MEASURE SIMULATOR HEADROOM AND HARDEN PAIRED STOCHASTIC EVALUATION BEFORE ANOTHER ARCHITECTURE CHANGE
+**Architecture status:** INCUMBENT SELECTED; NEW RELIABILITY-AWARE EXECUTOR EXPERIMENT JUSTIFIED  
+**Completed protocol:** `aegisswarm-evidence-hardening-v1`  
+**Current decision:** INTERACTION RELIABILITY IS THE DOMINANT MEASURED HEADROOM SOURCE; TEST RELIABILITY-AWARE ASSIGNMENT ON FRESH DEVELOPMENT DATA
 
-Read `docs/AEGISSWARM_SKILL.md` for full history and `EVIDENCE_HARDENING.md` for the active protocol.
+Read `docs/AEGISSWARM_SKILL.md` for long-form history and `EVIDENCE_HARDENING.md` for the completed headroom protocol.
 
-## Current incumbent
+## Incumbent before the next experiment
 
 ```text
 60-token state-reactive rule representation
@@ -16,186 +15,154 @@ Read `docs/AEGISSWARM_SKILL.md` for full history and `EVIDENCE_HARDENING.md` for
 + one-step RuleGuidedHungarianPolicy executor
 ```
 
-This remains the incumbent because:
+This remains the incumbent until a fresh controlled experiment demonstrates a better executor.
 
-- hybrid-objective development: local `0.805`, Axplorer `0.810`, Axplorer-local `+0.0055`, CI `[-0.0235,+0.0320]`;
-- optimizer-native V2: rules `0.813` vs native `0.701`, native-rule `-0.1120`, CI `[-0.1405,-0.08249]`;
-- rolling-horizon V2: one-step `0.808` vs rolling `0.801`, rolling-one-step `-0.0065`, CI `[-0.0325,+0.01825]`, roughly 14x slower.
+## Completed evidence-hardening result
 
-No proposer, representation, or planner variant currently has evidence strong enough to replace it.
-
-## Closed architecture tracks
-
-### Optimizer-native representation
-
-Closed. No V3 vector. Do not consume `12000–12399` confirmation.
-
-### Rolling-horizon planning
-
-Planner V1 was worse and exposed a receding-horizon action-deferral defect. Planner V2 corrected that defect but still failed to improve the incumbent on fresh development seeds `15000–15399`:
+Simulator V2 uses policy-independent indexed random draws and leaves the legacy simulator untouched. Full development used fresh seeds `17000–17399` and the same five frozen incumbent programs.
 
 ```text
-fixed_optimizer survival: 0.329
-rule_one_step survival:   0.808 CI=[0.776, 0.83575]
-rule_rolling_v2 survival: 0.801 CI=[0.76174375, 0.837]
-rolling - one_step:      -0.0065 CI=[-0.0325, +0.01825]
-per-program deltas:       [-0.025, -0.03625, +0.0225, -0.0075, +0.01375]
-scenario sign-flip p:     0.333083
-runtime one-step/rolling: 0.0128 s / 0.1774 s
+legacy incumbent reference:       0.818
+fixed optimizer v2:               0.326
+incumbent v2 normal:              0.801
+perfect sensing diagnostic:       0.801
+deterministic interaction diag:   0.999
+combined relaxation diagnostic:   0.999
+best-of-5 oracle v2:              0.938
+sensing headroom:                -0.0005 CI=[-0.00225, 0.0]
+interaction headroom:            +0.1980 CI=[0.166, 0.23625]
+combined headroom:               +0.1980 CI=[0.1645, 0.235]
 ```
 
-Do not run planner-aware training, do not build planner V3 by default, and do not consume `16000–16399` confirmation.
-
-## Active evidence-hardening phase
-
-The repeated low-80% survival regime has survived proposer, representation, and executor changes. The next question is therefore:
-
-> **How much headroom exists in the current synthetic environment, and which simulator-level limitations account for the remaining asset losses?**
-
-### Simulator V2
-
-New files:
-
-- `aegisswarm/random_tape.py`
-- `aegisswarm/simulator_v2.py`
-- `aegisswarm/evidence_hardening.py`
-- `aegisswarm/evidence_hardening_cli.py`
-- `tests/test_evidence_hardening.py`
-- `EVIDENCE_HARDENING.md`
-
-Legacy `Simulator` is deliberately untouched. Simulator V2 is an opt-in evidence path using policy-independent indexed random draws keyed by scenario seed and event identity for detection, motion noise, and abstract interaction outcomes.
-
-This improves common-random-number coupling without invalidating old protocols.
-
-### Frozen-program headroom diagnostics
-
-The active protocol loads the same five incumbent rule programs and evaluates:
+Normal per-program survival:
 
 ```text
-legacy incumbent reference
-fixed optimizer under Simulator V2
-incumbent under normal Simulator V2
-incumbent + perfect sensing diagnostic
-incumbent + deterministic interaction diagnostic
-incumbent + combined diagnostic
-best-of-5 per-scenario oracle diagnostic
+[0.7438, 0.8313, 0.8063, 0.8150, 0.8100]
 ```
 
-The relaxations are development diagnostics, not deployable assumptions or mathematical upper bounds. Best-of-5 is a non-deployable oracle used only to estimate scenario-dependent strategy-selection headroom.
+Best-of-5 oracle gap: `+0.1362` survival. Oracle choice counts across the 400 scenarios:
 
-### Failure attribution
-
-For asset-loss episodes, the suite first checks whether paired sensing/interaction relaxations improve survival. Residual cases are labeled from direct simulator counters including:
-
-- undetected penetrations;
-- real interaction failures;
-- resource exhaustion;
-- decoy resource use;
-- overload steps;
-- no in-range defender;
-- penetrations despite reachable remaining resources.
-
-These categories are descriptive development diagnostics, not causal proof.
-
-## Active evidence blocks
-
-- `17000–17399`: evidence-hardening development
-- `18000–18399`: reserved evidence/confirmation — **do not inspect**
-
-Quick mode uses `17000–17019`; once inspected those are development data.
-
-## Immediate runbook
-
-```bash
-git fetch origin
-git checkout agent/evidence-hardening
-git pull origin agent/evidence-hardening
-pytest -q
-python -m aegisswarm.evidence_hardening_cli --workers 14
+```text
+{program0: 63, program1: 180, program2: 77, program3: 53, program4: 27}
 ```
 
-Do not run `--full` until the quick output is inspected for:
+Normal Simulator V2 diagnostic means:
 
-1. reproducibility/test failures;
-2. pathological shift between legacy reference and normal Simulator V2;
-3. nonsensical diagnostic ordering;
-4. failure-attribution bugs.
-
-If quick is valid:
-
-```bash
-python -m aegisswarm.evidence_hardening_cli --full --workers 14
+```text
+detection_opportunities:               58.4975
+detections:                            29.9975
+real_interaction_attempts:             30.2020
+real_interaction_failures:             15.6610
+decoy_resource_uses:                    1.3665
+penetrations_undetected:                0.0000
+penetrations_no_in_range_defender:      0.0000
+penetrations_in_range_no_resource:      2.0450
+penetrations_with_reachable_resource:   0.4350
+overload_steps:                        42.6960
+resource_uses_remaining:                0.5315
+resource_exhausted fraction:            0.8515
 ```
 
-## Decision tree after full headroom development
+Development-only failed-episode attribution:
 
-### Large best-of-5 oracle gap
+```text
+interaction_stochasticity:      0.9956268
+strategy_selection_headroom:    0.0029155
+interaction_failure_residual:   0.0014577
+```
 
-Investigate a context-dependent strategy selector/meta-policy.
+Interpretation boundary: the deterministic-interaction relaxation is a loose counterfactual diagnostic, not an attainable-policy claim or mathematical upper bound. The attribution says failed episodes improve under the relaxation; it is descriptive rather than causal proof.
 
-### Large perfect-sensing gap
+## Main conclusion from headroom measurement
 
-Prioritize observation/state-estimation or abstract sensor-allocation work.
+The repeated ~80% regime is **not explained by sensing** and is **not close to the loose simulator envelope**.
 
-### Large deterministic-interaction gap
+The strongest measured bottleneck is the combination of stochastic abstract interaction outcomes and scarce resource use:
 
-Prioritize robust/risk-aware objectives, stochastic replications, and uncertainty-aware evaluation rather than more policy complexity.
+- perfect sensing changes survival by essentially zero;
+- deterministic valid interactions add about `+19.8` percentage points with a hierarchical CI entirely above zero;
+- normal episodes average `15.661` failed real interaction attempts;
+- resources are fully exhausted in about `85.15%` of program-scenario episodes;
+- undetected penetrations are zero;
+- decoy consumption is comparatively small.
 
-### Large resource/overload residual
+This motivates an executor that explicitly accounts for expected interaction success and scarce capacity rather than another proposer, strategic representation, or longer planning horizon.
 
-Sequential resource allocation/adaptive learning becomes better motivated.
+## Secondary conclusion — strategy specialization
 
-### Small headroom across diagnostics
+The non-deployable best-of-5 oracle reaches `0.938`, a `+13.62` pp gap above the mean frozen incumbent. All five programs are selected in some scenarios, so scenario-dependent strategy specialization is real enough to justify a later selector/meta-policy experiment.
 
-Stop optimizing this benchmark toward an arbitrary higher survival rate. Shift toward richer scenario families, robustness, tail risk/CVaR, scaling, stronger baselines, and external calibration.
+This is secondary to reliability-aware assignment because interaction headroom is larger and directly tied to resource loss.
+
+## Next experiment — reliability-aware assignment
+
+New architecture question:
+
+> Holding the five frozen 60-token programs fixed, can an executor that incorporates abstract success probability and limited contingent backup allocation improve survival/resource efficiency over the current one-step Hungarian executor?
+
+The experiment should separate two effects:
+
+1. **reliability-weighted one-to-one assignment** — same one-to-one semantics as the incumbent, but strategic utility is weighted by abstract success probability;
+2. **reliability-aware contingent backup allocation** — allow at most one backup resource for a high-value threat and optimize expected strategic value under stochastic failure, while preserving each defender's one-assignment-per-step constraint.
+
+No strategy retraining in the initial screen. No change to sensing, scenario generation, or stochastic interaction law.
+
+Because this architecture is motivated by the inspected `17000–17399` development result, it must use fresh evidence blocks.
+
+Proposed fresh blocks:
+
+- `19000–19399`: reliability-aware development
+- `20000–20399`: reserved reliability-aware confirmation — do not inspect during development
+
+Keep `18000–18399` untouched and tied to the completed evidence-hardening protocol; do not repurpose it.
+
+## Closed tracks
+
+- optimizer-native V2: materially worse; no V3; do not use `12000–12399` confirmation;
+- rolling-horizon V1/V2: no useful gain and much slower; no planner V3; do not use `16000–16399` confirmation;
+- sensing as the immediate bottleneck: not supported by evidence-hardening development.
 
 ## Evidence ledger
 
-Consumed development/evidence blocks include:
+Consumed development/evidence includes:
 
-- `2000–2099`: structured development-test;
-- `2100–2499`: V1 formal holdout;
-- `3000–3399`: Axplorer V2 development;
-- `4000–4399`: hybrid-executor development;
-- `5000–5399`: hybrid-objective development;
-- `9000–9399`: optimizer-native V1 development;
-- `11000–11399`: optimizer-native V2 development;
-- `13000–13399`: rolling-horizon planner V1 development;
-- `15000–15399`: rolling-horizon planner V2 development.
+- `2000–2099`: structured development-test
+- `2100–2499`: V1 formal holdout
+- `3000–3399`: Axplorer V2 development
+- `4000–4399`: hybrid-executor development
+- `5000–5399`: hybrid-objective development
+- `9000–9399`: optimizer-native V1 development
+- `11000–11399`: optimizer-native V2 development
+- `13000–13399`: rolling-horizon V1 development
+- `15000–15399`: rolling-horizon V2 development
+- `17000–17399`: evidence-hardening/headroom development
 
-Untouched older reserved blocks tied to abandoned/unfrozen protocols must not be silently repurposed as confirmation:
+Untouched reserved blocks tied to older protocols:
 
-- `6000–6399`;
-- `7000–7399`;
-- `8000–8399`;
-- `10000–10399`;
-- `12000–12399`;
-- `14000–14399`;
-- `16000–16399`.
-
-Active:
-
-- `17000–17399`: evidence development;
-- `18000–18399`: reserved evidence/confirmation.
+- `6000–6399`
+- `7000–7399`
+- `8000–8399`
+- `10000–10399`
+- `12000–12399`
+- `14000–14399`
+- `16000–16399`
+- `18000–18399`
 
 ## Claims policy
 
-Supported development-level conclusions:
+Supported development-level conclusions now include:
 
-- optimizer-aware searched 60-token rule strategies substantially improve the current fixed hand-written myopic objective in the legacy synthetic simulator;
-- Axplorer did not materially outperform conventional local/evolutionary search under the matched hybrid-objective protocol;
-- optimizer-native V2 was 11.2 percentage points worse than the 60-token rule representation on fresh development data;
-- corrected rolling-horizon V2 was effectively tied/slightly worse than one-step execution and about 14x slower;
-- the 60-token rules + optimizer-aware local search + one-step Hungarian executor remain the incumbent architecture.
+- the incumbent remains much stronger than the fixed hand-written optimizer baseline in the synthetic simulator;
+- Axplorer did not materially outperform optimizer-aware local/evolutionary search under the matched protocol;
+- optimizer-native V2 was materially worse than the 60-token rule representation;
+- corrected rolling-horizon execution did not improve the incumbent and was substantially slower;
+- under Simulator V2, perfect sensing produced essentially no survival headroom on `17000–17399`;
+- deterministic valid interactions produced a large positive diagnostic headroom (`+19.8` pp, CI `[+16.6,+23.625]` pp);
+- a best-of-5 frozen-program oracle produced substantial scenario-selection headroom (`+13.62` pp).
 
-Not yet supported:
+Not supported:
 
-- that ~81% is the attainable simulator ceiling;
-- any Simulator V2 performance claim before the active evidence protocol runs;
-- superiority to optimization generally;
-- superiority to state-of-the-art RL/MARL;
+- that deterministic interactions are attainable in a deployable system;
+- that reliability-aware assignment will improve performance before it is tested on fresh data;
+- superiority to optimization or RL generally;
 - real-world effectiveness or deployment readiness.
-
-## External target
-
-The project is still working backward from the currently tracked iDEX Open Challenge deadline of **30 September 2026, 11:59 PM**, last verified on 2026-08-17. Re-check the official source before submission work.
