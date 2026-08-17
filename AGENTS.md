@@ -21,7 +21,7 @@ Before changing algorithms, experiments, seed splits, claims, or submission mate
 9. **Preserve reproducibility.** Record protocol IDs, seeds, budgets, source branch/commit, output artifacts, confidence intervals, and any architecture change prompted by inspected results.
 10. **GitHub is the source of truth.** Keep the handoff/status documents updated when a major experiment finishes or the research direction changes.
 
-## Most recent completed conclusion
+## Most recent completed full-development conclusion
 
 `aegisswarm-hybrid-objective-v1` produced:
 
@@ -41,16 +41,33 @@ Conclusion:
 - `5000–5399` is consumed development data;
 - do not run `8000–8399` confirmation.
 
+## Optimizer-native V1 quick diagnosis
+
+The first native representation was stopped before full development after quick mode produced:
+
+```text
+fixed_optimizer: 0.350
+rule_objective:  0.688
+native_v1:       0.300
+native-rule:    -0.3875, CI [-0.650, -0.075], p=0.000100
+```
+
+This quick result exposed a malformed zero-centred native utility that frequently preferred no-op assignments and omitted state-reactive information already available to the rule comparator. **Do not interpret it as evidence against optimizer-native objectives generally.** V1 was invalidated before the full campaign.
+
 ## Current active experiment
 
 Branch: `agent/optimizer-native-objective`  
-Protocol: `aegisswarm-optimizer-native-objective-v1`
+Protocol: `aegisswarm-optimizer-native-objective-v2`
 
 Question:
 
-> Does a compact optimizer-native strategic objective outperform the current 60-token rule representation when both are retrained from scratch under the same local/evolutionary search seeds, 1,800-candidate budget, simulator, fitness, and Hungarian executor?
+> Does a smooth, state-reactive optimizer-native strategic objective outperform the current 60-token rule representation when both are retrained from scratch under the same local/evolutionary search seeds, candidate budget, simulator, fitness, and Hungarian executor?
 
-Development: `9000–9399`.  
-Reserved confirmation: `10000–10399`.
+V2 shares the rule-guided policy's positive structural base utility and learns continuous modifiers for urgency, asset value, threat class, distance, capacity, scarcity, reserve/release behavior, persistence, speed, target damage, and urgency-scarcity interaction.
+
+Development: `9000–9399` (development-only; first 20 already inspected during invalidated V1 quick).  
+Reserved confirmation: `10000–10399` (untouched).
+
+V2 uses new `artifacts/optimizer_native_v2_*` paths so V1 quick artifacts cannot be resumed.
 
 Do **not** run confirmation after development automatically. Interpret the development result and make an explicit freeze/no-freeze decision first.
