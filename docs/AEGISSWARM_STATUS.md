@@ -1,11 +1,11 @@
 # AegisSwarm — Current Research Status
 
 **Updated:** 2026-08-17  
-**Architecture status:** STOCHASTIC-ROBUST TRAINING V1 ACTIVE; NOT FROZEN FOR EXTERNAL CLAIMS  
-**Active branch:** `agent/stochastic-robust-training`  
-**Active protocol:** `aegisswarm-stochastic-robust-training-v1`
+**Architecture status:** STOCHASTIC-TRAINING V2 QUICK FAILED; STRATEGY SELECTION IS NEXT  
+**Active branch:** `agent/stochastic-training-ablation`  
+**Completed quick protocol:** `aegisswarm-stochastic-training-ablation-v2`
 
-Read `docs/AEGISSWARM_SKILL.md` for long-form history, `EVIDENCE_HARDENING.md` for Simulator V2 headroom evidence, `RELIABILITY_AWARE.md` for the completed executor screen, and `STOCHASTIC_ROBUST.md` for the active protocol.
+Read `docs/AEGISSWARM_SKILL.md` for long-form history, `EVIDENCE_HARDENING.md` for Simulator V2 headroom evidence, `RELIABILITY_AWARE.md` for the reliability-executor screen, `STOCHASTIC_ROBUST.md` for robust-training V1, and `STOCHASTIC_TRAINING_ABLATION.md` for V2.
 
 ## Incumbent architecture
 
@@ -15,141 +15,104 @@ Read `docs/AEGISSWARM_SKILL.md` for long-form history, `EVIDENCE_HARDENING.md` f
 + one-step RuleGuidedHungarianPolicy executor
 ```
 
-The incumbent is not replaced by the reliability-aware executor screen.
+No tested proposer, compact representation, planner, reliability executor, or repeated-tape training protocol has robustly replaced this incumbent.
 
-## Evidence that motivates the active protocol
+## Completed evidence that determines the next step
 
 ### Simulator V2 headroom — `17000–17399`
 
 ```text
-incumbent v2 normal:              0.801
-perfect sensing diagnostic:      0.801
-deterministic interaction diag:  0.999
-best-of-5 oracle v2:              0.938
-sensing headroom:                -0.0005 CI=[-0.00225, 0.0]
-interaction headroom:            +0.1980 CI=[0.166, 0.23625]
+normal incumbent:              0.801
+perfect sensing:               0.801
+deterministic interactions:    0.999
+interaction headroom:         +0.1980 CI=[+0.166,+0.23625]
+best-of-5 oracle:              0.938
 ```
 
-The deterministic-success result is a loose counterfactual diagnostic, not an attainable-policy or mathematical upper-bound claim. Normal episodes averaged `15.661` failed real interaction attempts and exhausted abstract uses in `85.15%` of program-scenario episodes.
+The deterministic-success relaxation is a loose counterfactual diagnostic, not an attainable-policy claim. The best-of-5 oracle is also non-deployable; it is evidence that the frozen strategies specialize across scenarios.
+
+On the same evidence block, frozen-program survival rates were approximately:
+
+```text
+[0.7438, 0.8313, 0.8063, 0.8150, 0.8100]
+```
+
+So the oracle `0.938` is about `+10.7 pp` above the strongest fixed frozen program on that block, not merely above the mean program performance.
 
 ### Reliability-aware executor screen — `19000–19399`
 
 ```text
-incumbent survival:               0.809
-reliability-weighted survival:    0.810
-contingent-backup survival:       0.825
-weighted - incumbent:            +0.0003 CI=[-0.0165, +0.01775]
-backup - incumbent:              +0.0155 CI=[-0.00625, +0.03575625]
-backup - weighted:               +0.0152 CI=[-0.00825, +0.0375]
-per-program backup deltas:        [-0.0025, +0.0250, +0.0200, +0.02875, +0.00625]
-runtime inc/wgt/bak:              0.0218s / 0.0219s / 0.0450s
+incumbent:                    0.809
+reliability weighted:         0.810
+contingent backup:            0.825
+weighted-incumbent:          +0.0003 CI=[-0.0165,+0.01775]
+backup-incumbent:            +0.0155 CI=[-0.00625,+0.03575625]
+```
+
+Decision: weighting-only is null; backup is a weak positive but did not earn confirmation. Do not inspect `20000–20399`.
+
+### Stochastic-robust V1 quick — CLOSED
+
+V1 mixed repeated stochastic candidate evaluation with backup-executor co-adaptation. Quick result on inspected `22000–22019`:
+
+```text
+robust inc/inc:          0.713
+robust backup/backup:    0.625
+co-adapted delta:       -0.0875 CI=[-0.225,+0.05]
+per-run deltas:         [-0.05,-0.125]
+```
+
+Do not run full V1 and do not inspect `23000–23399`.
+
+### Stochastic-training V2 quick — CLOSED
+
+V2 cleanly isolated repeated stochastic candidate evaluation under the same incumbent executor. Quick result on fresh `25000–25019`:
+
+```text
+frozen reference:               0.795
+single-tape training:           0.787
+repeated-tape training:         0.725
+repeated - single:             -0.0625 CI=[-0.200,+0.050]
+per-run deltas:                 [-0.100,-0.025]
+training rollouts/candidate:    4 / 8
+runtime single/repeated:        0.0171s / 0.0166s
 ```
 
 Decision:
 
-- reliability weighting is effectively a null result;
-- contingent backup is only a weak positive and does not earn confirmation;
-- do not inspect `20000–20399`;
-- do not declare backup the incumbent;
-- stop one-step executor micro-tuning by default.
+- repeated-tape candidate evaluation fails the quick gate;
+- both paired search-run effects are negative;
+- do **not** run V2 `--full`;
+- do **not** inspect `26000–26399` confirmation;
+- stop repeated-tape training as the next performance direction by default.
 
-## Active experiment — stochastic-robust strategy training V1
+The frozen reference is descriptive only and is not used to infer the repeated-tape effect.
 
-Question:
+## Next experiment — observability-safe strategy selection
 
-> Holding the 60-token representation, local/evolutionary search family and scalar score fixed, does evaluating each candidate across multiple matched Simulator V2 random tapes per structural scenario produce strategies that generalize better under stochastic interaction outcomes?
+The strongest remaining empirical signal is frozen-strategy specialization. The earlier best-of-5 oracle reached `0.938`, while the strongest individual frozen program on that block was about `0.831`.
 
-### What changes
+Next question:
 
-Only the stochastic training distribution:
+> Can a selector using only information observable before the first action choose among the five existing frozen 60-token programs better than committing to one globally fixed program?
 
-- structural scenario/world seed is separated from random-tape seed;
-- every candidate in both training arms sees the same world×tape bundle;
-- metrics are averaged across replications before applying the established scalar fitness.
+The first selector experiment should be deliberately simple and interpretable:
 
-V1 does **not** add CVaR, a risk coefficient, new rule tokens, Axplorer, a planning horizon, or a new interaction model.
+- keep all five frozen programs unchanged;
+- use Simulator V2 indexed randomness;
+- take a feature snapshot after the simulator's first sensing step and before the first assignment;
+- features may use only detected active threats plus known assets, defenders, sensors and resource state;
+- never use undetected threat type/position, future trajectories, realized interaction outcomes, or oracle labels at evaluation time;
+- fit one fixed ridge reward model per program from development-training scenarios;
+- choose the program with highest predicted established scalar reward;
+- compare against the **best fixed program selected on selector-training data**, not against the mean of five programs;
+- report the non-deployable oracle on fresh development only as remaining headroom.
 
-### Paired training arms
-
-1. `robust_local_incumbent` — search through `RuleGuidedHungarianPolicy`;
-2. `robust_local_backup` — search through `ReliabilityAwareBackupPolicy`.
-
-Both use the same search seeds, initial search mechanics, candidate budget, structural worlds and random tapes.
-
-### 2×2 cross-evaluation
-
-Fresh evaluation runs both discovered program sets under both executors:
-
-```text
-incumbent-trained program × incumbent executor
-incumbent-trained program × backup executor
-backup-trained program    × incumbent executor
-backup-trained program    × backup executor
-```
-
-This separates program adaptation, executor effect and co-adaptation.
-
-The five old frozen incumbent programs are reported under both executors as descriptive references only; they were trained under a different simulator generation/protocol.
-
-## Quick protocol — run first
-
-```text
-paired search runs:      2
-candidate budget:        128 per arm/run
-training worlds:         4
-random tapes/world:      2
-rollouts/candidate:      8
-evaluation:              22000–22019
-```
-
-```bash
-python -m aegisswarm.stochastic_robust_cli --workers 14
-```
-
-Do **not** run `--full` until the quick output is inspected.
-
-## Full development protocol — only if quick passes
-
-```text
-paired search runs:      5
-candidate budget:        1800 per arm/run
-training worlds:         12
-random tapes/world:      3
-rollouts/candidate:      36
-development evaluation:  22000–22399
-```
-
-Reserved confirmation: `23000–23399` — **do not inspect during development**.
-
-Training structural-world pool: `21000–21031`; full V1 uses the first 12.
-
-## Decision gate
-
-### Robust incumbent training improves
-
-Repeated-tape training itself is useful. Keep incumbent execution unless backup adds a clear incremental effect.
-
-### Co-adapted robust backup improves materially
-
-Training and contingent execution are complementary; this becomes a candidate architecture for a later frozen protocol.
-
-### Both robust arms tie old frozen references
-
-Mean replicated training does not capture the remaining stochastic headroom. A later explicit tail-risk/CVaR objective becomes more justified than further executor tweaking.
-
-### Both worsen
-
-Close V1 and retain the incumbent.
-
-No confirmation is authorized by quick evidence or an ambiguous development result.
-
-## Secondary future track
-
-The best-of-5 frozen-program oracle reached `0.938`, a `+13.62` pp gap over mean incumbent performance. Context-dependent strategy selection remains a justified secondary experiment after this robust-training test.
+Use new blocks because this architecture is motivated by inspected oracle results and failed stochastic-training experiments.
 
 ## Evidence ledger
 
-Consumed development/evidence includes:
+Consumed/inspected blocks include:
 
 - `2000–2099`: structured development-test
 - `2100–2499`: V1 formal holdout
@@ -162,24 +125,12 @@ Consumed development/evidence includes:
 - `15000–15399`: rolling-horizon V2 development
 - `17000–17399`: evidence-hardening/headroom development
 - `19000–19399`: reliability-aware executor development
+- `21000–21003`: stochastic-robust V1 quick training worlds inspected
+- `22000–22019`: stochastic-robust V1 quick evaluation inspected
+- `24000–24003`: stochastic-training V2 quick training worlds inspected
+- `25000–25019`: stochastic-training V2 quick evaluation inspected
 
-Untouched reserved blocks tied to older protocols must not be repurposed:
-
-- `6000–6399`
-- `7000–7399`
-- `8000–8399`
-- `10000–10399`
-- `12000–12399`
-- `14000–14399`
-- `16000–16399`
-- `18000–18399`
-- `20000–20399`
-
-Current robust protocol:
-
-- `21000–21031`: training structural worlds
-- `22000–22399`: development evaluation
-- `23000–23399`: reserved confirmation
+Reserved blocks tied to abandoned/unfrozen protocols must not be repurposed silently, including `18000–18399`, `20000–20399`, `23000–23399`, and `26000–26399`.
 
 ## Claims policy
 
@@ -190,13 +141,14 @@ Supported development-level conclusions:
 - corrected rolling-horizon execution did not improve the incumbent;
 - perfect-sensing headroom was essentially zero on `17000–17399`;
 - deterministic valid interactions showed large diagnostic headroom (`+19.8` pp, CI entirely positive);
-- best-of-5 frozen-program oracle showed substantial scenario-selection headroom (`+13.62` pp);
-- reliability-weighted Hungarian did not improve survival on the full fresh screen;
-- contingent backup produced a small positive point estimate (`+1.55` pp) but did not establish a robust improvement.
+- the five frozen strategies exhibit substantial best-of-set scenario specialization;
+- reliability-weighted Hungarian did not improve full-screen survival;
+- contingent backup produced only a small uncertain positive point estimate;
+- repeated-tape stochastic candidate evaluation failed its clean V2 quick gate.
 
 Not supported:
 
-- stochastic-robust training superiority before the active experiment runs;
+- strategy-selector superiority before the next experiment;
 - deterministic interaction success as attainable;
 - contingent-backup executor superiority;
 - superiority to optimization or RL generally;
