@@ -3,13 +3,13 @@
 **Updated:** 2026-08-17  
 **Architecture status:** NOT FROZEN  
 **Active branch:** `agent/rolling-horizon-planning`  
-**Active protocol:** `aegisswarm-rolling-horizon-screen-v1`
+**Active protocol:** `aegisswarm-rolling-horizon-screen-v2`
 
 Read `docs/AEGISSWARM_SKILL.md` for full history. This file is the latest-state overlay.
 
-## Latest completed architecture result — optimizer-native V2
+## Incumbent architecture before planning
 
-Fresh development seeds `11000–11399`:
+The optimizer-native representation track is closed. On fresh development seeds `11000–11399`:
 
 ```text
 fixed_optimizer survival:      0.320
@@ -21,93 +21,127 @@ paired p-value:                0.000050
 
 Decision:
 
-- optimizer-native V2 is materially worse than the incumbent 60-token state-reactive rule representation;
-- close the optimizer-native representation track;
-- no V3 vector;
+- retain the 60-token state-reactive rule representation;
+- no optimizer-native V3;
 - do not consume `12000–12399` confirmation;
-- retain the 60-token rules as the strategic representation incumbent.
+- proposer/representation tuning is deprioritized.
 
-The result also reinforces the earlier conclusions that Axplorer is not currently the important bottleneck and that optimizer-aware local/evolutionary search is a strong default offline learner.
+## Rolling-horizon planner V1 — full screen completed
 
-## Active hypothesis — planning horizon
+The first planning screen held the five already-trained strong 60-token rule programs fixed and changed only execution from one-step Hungarian matching to a horizon-4 receding-horizon MILP.
 
-The next question is:
-
-> **Holding the strong 60-token strategy fixed, can short receding-horizon planning outperform the same strategy executed by one-step Hungarian matching?**
-
-The project is now testing temporal allocation/planning, not proposer choice or another representation.
-
-## Active screening experiment
-
-Implementation:
-
-- `aegisswarm/rolling_horizon.py`
-- `aegisswarm/rolling_horizon_ablation.py`
-- `aegisswarm/rolling_horizon_cli.py`
-- `ROLLING_HORIZON.md`
-
-The planner reuses the existing `RuleGuidedHungarianPolicy` pair utility and adds a short time-indexed binary allocation over projected synthetic timesteps. Only the first planned action is executed; the planner re-solves after each new observation.
-
-This first stage holds five already-trained strong rule programs fixed. It is only a **screening ablation** to decide whether planner-aware retraining is worth the cost.
-
-Comparison:
+Full development screen on consumed seeds `13000–13399`:
 
 ```text
-fixed hand-written one-step optimizer
-same frozen rule programs + one-step Hungarian
-same frozen rule programs + rolling-horizon planning
+fixed_optimizer survival: 0.310
+rule_one_step survival:   0.782 CI=[0.739, 0.81775]
+rule_rolling survival:    0.752 CI=[0.7125, 0.7900]
+rolling - one_step:      -0.0300 CI=[-0.07775, +0.01825625]
+scenario-level sign-flip p-value: 0.000700
+runtime one-step/rolling: 0.0125 s / 0.1837 s per scenario
 ```
 
-Default screen settings:
+### Interpretation
 
-- horizon: 4 synthetic timesteps;
-- discount: 0.90;
-- per-solve time limit: 0.25 s;
-- source strategies: `artifacts/optimizer_native_v2_dev/runs/rule_objective_seed_44001..44005.json`.
+1. Planner V1 **did not earn planner-aware retraining**. The point estimate is -3.0 percentage points and runtime is about 15x one-step execution.
+2. The paired hierarchical interval crosses zero, so the architecture-level effect is not robustly separated from zero once variation across the five frozen programs is included.
+3. The very small sign-flip p-value is not directly contradictory: that test first averages the five program-specific differences for each scenario and tests scenario-level consistency, whereas the hierarchical interval resamples both programs and scenarios.
+4. There is therefore no positive evidence for V1. The correct action is diagnose the formulation once, not train through it or increase horizon blindly.
 
-### Quick screen — PASSED AS A DEVELOPMENT GATE
+## Concrete V1 defect found — receding-horizon procrastination
 
-Quick screen on planning-development seeds `13000–13019`:
+V1 projected threats into future states and then called the existing state-reactive rule utility on those future states.
 
-```text
-fixed_optimizer survival: 0.300
-rule_one_step survival:   0.820 CI=[0.700, 0.910]
-rule_rolling survival:    0.830 CI=[0.730, 0.915]
-rolling - one_step:       +0.0100 CI=[-0.090, +0.100125]
-paired p-value:           0.883656
-runtime one-step/rolling: 0.0130 s / 0.1866 s
-```
+That creates a temporal incentive problem:
 
-Interpretation:
+- a threat can be reachable and worth acting on now;
+- at h>0 it is projected closer to the protected asset and may trigger stronger urgency-conditioned rules;
+- its future utility can therefore exceed its current utility despite temporal discounting;
+- the MILP may schedule it for h>0;
+- only h=0 is actually executed;
+- on the next simulator step the problem is solved again and the action can again be pushed into the future.
 
-1. This is a 20-scenario integration/development screen, not evidence of superiority.
-2. The rolling-horizon planner is **not pathologically worse** than one-step execution and has a small positive survival point estimate (+1 pp).
-3. The interval is far too wide and p-value far too large to infer a performance advantage.
-4. Rolling-horizon execution is substantially slower than one-step execution, but absolute runtime remains sub-second in this synthetic screen, so runtime does not yet kill the hypothesis.
-5. The planning hypothesis therefore **passes the quick gate** and justifies the full 400-scenario development screen before any planner-aware retraining.
+This is a receding-horizon action-deferral/procrastination pathology. It is a planner formulation issue, not evidence that temporal planning in general is useless.
 
-## Fresh planning evidence
+## Active experiment — rolling-horizon planner V2
 
-- `13000–13399`: planning development; first 20 seeds are now inspected development data;
-- `14000–14399`: reserved planning confirmation — **do not inspect**.
+Protocol: `aegisswarm-rolling-horizon-screen-v2`
+
+V2 changes one planning semantic only:
+
+> Projection controls future reachability, but an already-feasible defender/threat pair is not allowed to become more valuable merely because execution is delayed.
+
+Implementation rule:
+
+- compute current rule-derived pair utility;
+- compute projected future utility/reachability;
+- if the pair is already positive/feasible now, cap each h>0 strategic value at the current value;
+- then apply temporal discounting;
+- future-only reachable pairs may still enter the horizon normally.
+
+This preserves the winning 60-token strategic representation and the same planning structure while directly removing the diagnosed deferral incentive.
+
+## Fresh planner V2 evidence
+
+Because V2 was designed after inspecting the entire V1 development screen, it receives fresh blocks:
+
+- `15000–15399`: **planner V2 development**;
+- `16000–16399`: **planner V2 reserved confirmation**.
+
+Do not reuse:
+
+- `13000–13399`: consumed planner-V1 development;
+- `14000–14399`: untouched but tied to the abandoned planner-V1 evidence plan; do not silently repurpose it.
+
+## Statistical reporting change
+
+Planner V2 reports all three of the following for survival:
+
+1. paired mean effect and hierarchical 95% CI across programs + scenarios;
+2. the five per-program mean survival deltas;
+3. scenario-level sign-flip p-value.
+
+The hierarchical interval is the primary architecture-level uncertainty summary because the five rule programs represent independent discovered strategies. The scenario-level sign-flip result is supplementary.
 
 ## Immediate runbook
 
-The next command is the full fixed-policy planning screen:
+Pull the V2 code and run tests:
 
 ```bash
-python -m aegisswarm.rolling_horizon_cli --full --workers 5
+git checkout agent/rolling-horizon-planning
+git pull origin agent/rolling-horizon-planning
+pytest -q
 ```
 
-This is still a screening ablation with frozen existing rule programs. It does **not** retrain strategies through the planner.
+Then run the fresh V2 quick screen only:
 
-After the 400-scenario result:
+```bash
+python -m aegisswarm.rolling_horizon_cli --workers 5
+```
 
-- if rolling horizon produces a meaningful positive effect without unacceptable runtime/resource tradeoffs, build a new **planner-aware rule-training protocol** using fresh development/confirmation blocks and matched candidate-evaluation budgets;
-- if it is essentially tied, inspect penetrations, damage, resource consumption and runtime before deciding whether planner-aware training is worth one formal attempt;
-- if it is materially worse, diagnose the planning formulation once and then prefer the one-step executor rather than blindly increasing horizon/complexity.
+Expected markers:
 
-Do not consume `14000–14399` during this screening stage.
+```text
+AegisSwarm rolling-horizon V2 screen
+=== ROLLING-HORIZON V2 SCREEN ===
+Saved: artifacts/rolling_horizon_v2_quick
+```
+
+Do **not** run `--full` until the V2 quick result is inspected.
+
+## V2 decision gate
+
+### V2 no longer harmful / positive signal
+
+Run the full `15000–15399` screen. Planner-aware rule training is considered only if the full screen then shows a useful effect or compelling secondary-metric tradeoff.
+
+### V2 remains materially worse
+
+Stop this rolling-horizon formulation. Keep one-step `RuleGuidedHungarianPolicy` as the incumbent executor and move to another bottleneck rather than building a planner V3 by default.
+
+### V2 roughly ties
+
+Use per-program deltas, penetrations, damage, resources and runtime to decide whether one planner-aware training attempt is justified. A tie alone does not earn a training campaign.
 
 ## Evidence ledger
 
@@ -120,34 +154,37 @@ Consumed:
 - `5000–5399`: hybrid-objective development;
 - `9000–9399`: optimizer-native V1 development;
 - `11000–11399`: optimizer-native V2 development;
-- `13000–13019`: rolling-horizon quick development subset.
+- `13000–13399`: rolling-horizon planner V1 development.
 
-Untouched older reserved blocks, each tied to an older unfrozen/abandoned protocol:
+Untouched older reserved blocks tied to abandoned/unfrozen protocols:
 
 - `6000–6399`;
 - `7000–7399`;
 - `8000–8399`;
 - `10000–10399`;
-- `12000–12399`.
+- `12000–12399`;
+- `14000–14399`.
 
-Active planning:
+Active planner V2:
 
-- `13000–13399`: development;
-- `14000–14399`: reserved confirmation.
+- `15000–15399`: development;
+- `16000–16399`: reserved confirmation.
 
 ## Claims policy
 
-Supported development-level claims:
+Supported development-level conclusions:
 
-- optimizer-aware searched rule strategies strongly outperform the current fixed hand-written myopic objective in this synthetic simulator;
+- optimizer-aware searched rule strategies substantially improve the current fixed hand-written myopic optimizer baseline in this synthetic simulator;
 - Axplorer did not materially outperform local/evolutionary search under the matched hybrid-objective protocol;
 - optimizer-native V2 was 11.2 percentage points worse than the 60-token rule representation on fresh development data;
 - the 60-token rule representation is the strongest strategic representation tested so far;
-- a 20-scenario rolling-horizon quick screen completed successfully with survival in the same regime as one-step rule-guided execution, justifying a larger development screen.
+- rolling-horizon planner V1 did not improve the incumbent frozen rule strategies and had a -3.0 pp point estimate with materially higher runtime;
+- V1 exposed a concrete receding-horizon action-deferral flaw now being tested in corrected planner V2 on fresh development data.
 
-Not yet supported:
+Not supported:
 
-- that rolling-horizon planning is better;
+- that rolling-horizon planning is superior;
+- that the planning horizon is definitively the bottleneck;
 - superiority to optimization generally;
 - superiority to state-of-the-art RL/MARL;
 - real-world effectiveness or deployment readiness.
