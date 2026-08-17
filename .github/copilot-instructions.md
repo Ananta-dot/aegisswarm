@@ -9,8 +9,15 @@ Before making changes, read in this order:
 
 The architecture is **not frozen**. The active branch is `agent/optimizer-native-objective` and the active protocol is `aegisswarm-optimizer-native-objective-v2`.
 
-The first optimizer-native quick experiment (V1) was invalidated before full development because its zero-centred utility was not semantically comparable to the rule-guided policy and frequently preferred no-op assignments. Do not use that quick result as evidence against optimizer-native objectives generally.
+Optimizer-native V1 is rejected. Its full development campaign on `9000–9399` produced 35.9% survival versus 78.7% for the retrained rule-objective comparator, and inspection confirmed malformed zero-centred/no-op utility semantics plus severe generalization failure. Do not rerun/tune V1 and do not treat `9000–9399` as fresh.
 
-V2 shares the rule-guided structural base utility and searches smooth state-reactive modifiers. Development is `9000–9399`; reserved confirmation `10000–10399` remains untouched and must not be consumed without an explicit freeze decision.
+V2 shares the rule-guided structural base utility and searches smooth state-reactive modifiers. Because V2 was designed after inspecting V1, it uses fresh evidence blocks:
 
-Do not change protocol semantics mid-run or make broad superiority claims without following the handoff/status documents.
+- development: `11000–11399`
+- reserved confirmation: `12000–12399`
+
+The old `10000–10399` block remains untouched but belongs to the abandoned V1 plan; do not silently repurpose it.
+
+Expected V2 output contains `optimizer-native-v2`, `native-v2-local`, and `optimizer_native_v2_*`. If output still says `native-local` or `optimizer_native_dev`, the checkout is stale.
+
+Do not consume confirmation, change protocol semantics mid-run, or make broad superiority claims without following the handoff/status documents.
