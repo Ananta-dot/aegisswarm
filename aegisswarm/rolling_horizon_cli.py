@@ -9,11 +9,11 @@ def build_parser():
     parser = argparse.ArgumentParser(
         prog="python -m aegisswarm.rolling_horizon_cli",
         description=(
-            "Screen short rolling-horizon planning against the same frozen 60-token "
+            "Screen rolling-horizon planner V2 against the same frozen 60-token "
             "rule strategies executed by one-step Hungarian assignment."
         ),
     )
-    parser.add_argument("--full", action="store_true", help="use all planning-development scenarios")
+    parser.add_argument("--full", action="store_true", help="use all planner-V2 development scenarios")
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--horizon", type=int, default=4)
     parser.add_argument("--discount", type=float, default=0.90)
@@ -26,9 +26,9 @@ def build_parser():
 def main():
     args = build_parser().parse_args()
     out_dir = args.out_dir or (
-        "artifacts/rolling_horizon_dev_screen"
+        "artifacts/rolling_horizon_v2_dev_screen"
         if args.full
-        else "artifacts/rolling_horizon_quick"
+        else "artifacts/rolling_horizon_v2_quick"
     )
     run_planning_screen(
         source_dir=args.source_dir,
