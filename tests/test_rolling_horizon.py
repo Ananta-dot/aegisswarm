@@ -56,11 +56,42 @@ def test_rolling_horizon_horizon_one_returns_valid_current_plan():
 
 
 def test_v2_does_not_inflate_future_value_for_currently_feasible_pair():
-    # This directly guards the V1 receding-horizon procrastination mechanism.
-    tokens = np.full(PROGRAM_LENGTH, 15, dtype=np.int16)
+    """Guard the V1 receding-horizon procrastination mechanism deterministically.
+
+    Use a disabled-rule program so the positive structural base utility is the only
+    strategic contribution, then construct one defender/threat pair that is
+    reachable now and remains reachable throughout the short horizon. This avoids
+    relying on a random scenario to happen to contain an admissible h=0 -> h>0
+    pair and makes the regression test exercise the V2 cap directly.
+    """
+    tokens = np.zeros(PROGRAM_LENGTH, dtype=np.int16)
     scenario = ScenarioGenerator().generate(seed=91)
-    for threat in scenario.threats:
-        threat.detected = True
+
+    defender = scenario.defenders[0]
+    threat = scenario.threats[0]
+    asset = next(a for a in scenario.assets if a.id == threat.target_asset_id)
+
+    # Deterministic synthetic geometry: the pair is feasible now and for all four
+    # projected steps, while the threat remains well outside the target radius.
+    asset.x = 90.0
+    asset.y = 90.0
+    defender.x = 20.0
+    defender.y = 20.0
+    defender.range = 100.0
+    defender.available = True
+    defender.remaining_uses = max(int(defender.remaining_uses), 4)
+
+    threat.x = 30.0
+    threat.y = 30.0
+    threat.vx = 1.0
+    threat.vy = 1.0
+    threat.active = True
+    threat.detected = True
+
+    # Keep the fixture focused on this pair so unrelated randomly generated
+    # tracks cannot make the assertion vacuous or ambiguous.
+    for other in scenario.threats[1:]:
+        other.active = False
 
     policy = RuleGuidedRollingHorizonPolicy(
         tokens,
@@ -70,26 +101,20 @@ def test_v2_does_not_inflate_future_value_for_currently_feasible_pair():
     )
     _, _, variables = policy._candidate_variables(scenario)
 
-    grouped = {}
-    for var in variables:
-        key = (var["defender_index"], var["threat_index"])
-        grouped.setdefault(key, []).append(var)
+    pair_vars = [
+        var
+        for var in variables
+        if var["defender_index"] == 0 and var["threat_index"] == 0
+    ]
+    by_h = {var["h"]: var for var in pair_vars}
 
-    checked = 0
-    for vars_for_pair in grouped.values():
-        by_h = {v["h"]: v for v in vars_for_pair}
-        if 0 not in by_h:
-            continue
-        current = by_h[0]
-        if not current["current_positive"]:
-            continue
-        for h, future in by_h.items():
-            if h == 0:
-                continue
-            assert future["utility"] <= current["utility"] + 1e-12
-            checked += 1
+    assert set(by_h) == {0, 1, 2, 3}
+    assert by_h[0]["current_positive"] is True
 
-    assert checked > 0
+    current_utility = by_h[0]["utility"]
+    for h in (1, 2, 3):
+        assert by_h[h]["current_positive"] is True
+        assert by_h[h]["utility"] < current_utility
 
 
 def test_planning_v2_seed_blocks_are_fresh():
