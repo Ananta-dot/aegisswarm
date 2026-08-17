@@ -6,11 +6,12 @@ Read in order before changing algorithms, protocols, seeds, or claims:
 
 1. `docs/AEGISSWARM_SKILL.md` — long-form history.
 2. `docs/AEGISSWARM_STATUS.md` — latest-state overlay; supersedes older current wording.
-3. `STOCHASTIC_TRAINING_ABLATION.md` — active V2 protocol.
-4. `STOCHASTIC_ROBUST.md` — closed V1 robust-training history.
-5. `EVIDENCE_HARDENING.md` — completed Simulator V2/headroom protocol.
-6. `RELIABILITY_AWARE.md` — completed reliability-executor screen.
-7. `ROLLING_HORIZON.md` — completed planner history.
+3. `STRATEGY_SELECTOR.md` — active selector protocol.
+4. `STOCHASTIC_TRAINING_ABLATION.md` — closed repeated-tape V2.
+5. `STOCHASTIC_ROBUST.md` — closed robust-training V1.
+6. `EVIDENCE_HARDENING.md` — completed Simulator V2/headroom protocol.
+7. `RELIABILITY_AWARE.md` — completed reliability-executor screen.
+8. `ROLLING_HORIZON.md` — completed planner history.
 
 ## Non-negotiable rules
 
@@ -24,6 +25,7 @@ Read in order before changing algorithms, protocols, seeds, or claims:
 8. Keep handoff/status docs current after major experiments.
 9. Do not run confirmation merely because a quick or development point estimate is positive.
 10. Legacy `Simulator` and `SimulatorV2` are different protocol generations; label them explicitly.
+11. Selector features must never expose undetected threat state, scenario seed, future outcomes or oracle information.
 
 ## Current incumbent
 
@@ -33,62 +35,74 @@ Read in order before changing algorithms, protocols, seeds, or claims:
 + one-step RuleGuidedHungarianPolicy
 ```
 
-No tested proposer, compact representation, planner, reliability weighting, or backup executor has robustly replaced it.
+No tested proposer, compact representation, planner, reliability executor, or repeated-tape training scheme has robustly replaced it.
 
-## Key current-generation evidence
+## Evidence that matters now
 
-Simulator V2 headroom (`17000–17399`): normal `0.801`, perfect sensing `0.801`, deterministic interactions `0.999`, interaction diagnostic headroom `+0.1980 CI=[+0.166,+0.23625]`, best-of-5 oracle `0.938`.
-
-Reliability executor (`19000–19399`): incumbent `0.809`, weighted `0.810`, backup `0.825`; weighting is null and backup is only a weak positive (`+0.0155 CI=[-0.00625,+0.03575625]`). Do not inspect `20000–20399`.
-
-Stochastic-robust V1 quick (`22000–22019`) closed the backup/co-adaptation hypothesis:
+Simulator V2 headroom on `17000–17399`:
 
 ```text
-robust inc/inc:          0.713
-robust backup/backup:    0.625
-co-adapted delta:       -0.0875 CI=[-0.225,+0.05]
-per-run deltas:         [-0.05,-0.125]
+normal mean:                  0.801
+perfect sensing:             0.801
+deterministic interactions:  0.999
+best-of-5 frozen oracle:     0.938
+program survivals:           [0.7438,0.8313,0.8063,0.8150,0.8100]
 ```
 
-Do not run V1 full and do not inspect `23000–23399`. V1 quick inspected training worlds `21000–21003` and evaluation `22000–22019`; do not reuse the remainder of those V1 blocks as unseen evidence for a changed protocol.
+The oracle is about `+10.7 pp` above the strongest fixed frozen program on that block, motivating strategy selection. It is non-deployable hindsight.
 
-## Active phase — stochastic-training ablation V2
+Reliability executor on `19000–19399`: weighting null; backup `+1.55 pp` with CI crossing zero. Do not inspect `20000–20399`.
 
-Branch: `agent/stochastic-training-ablation`  
-Protocol: `aegisswarm-stochastic-training-ablation-v2`
+Stochastic-robust V1 quick: co-adapted backup minus incumbent `-8.75 pp`; V1 closed. Do not inspect `23000–23399`.
 
-Primary comparison:
-
-1. single-tape Simulator V2 training;
-2. repeated-tape Simulator V2 training.
-
-Both arms use the same incumbent `RuleGuidedHungarianPolicy`, 60-token representation, local/evolutionary search, search seeds, structural worlds, candidate budget and scalar score. The repeated arm includes the single arm's replicate-0 tape plus additional matched tapes for every world.
-
-Fresh V2 blocks:
-
-- `24000–24031`: structural training worlds;
-- `25000–25399`: development evaluation;
-- `26000–26399`: reserved confirmation — **do not inspect**.
-
-Quick V2:
+Clean stochastic-training V2 quick:
 
 ```text
-2 paired search runs
-128 candidates/arm/run
-4 structural worlds
-single:   1 tape/world = 4 rollouts/candidate
-repeated: 2 tapes/world = 8 rollouts/candidate
-evaluation: 25000–25019
+single tape:       0.787
+repeated tape:     0.725
+repeated-single:  -0.0625 CI=[-0.200,+0.050]
+per-run deltas:   [-0.100,-0.025]
 ```
+
+V2 closed. Do not inspect `26000–26399`.
+
+## Active phase — observable strategy selector V1
+
+Branch: `agent/strategy-selector`  
+Protocol: `aegisswarm-observable-strategy-selector-v1`
+
+Frozen policy set: the same five incumbent 60-token programs.
+
+Selector timing:
+
+```text
+SimulatorV2 t=0 sensing
+    -> observable feature snapshot
+    -> choose one frozen program
+    -> commit for episode
+```
+
+Allowed features use detected threats plus known assets/defenders/sensors/resources. Undetected threat state is forbidden and tested for leakage.
+
+V1 model: five fixed ridge reward regressors (`alpha=1.0`, untuned). Each predicts the established scalar episode reward of one frozen program from the t=0 observable feature vector.
+
+Primary comparator: the best globally fixed frozen program selected on selector-training data. Do not compare primarily against the mean of five programs.
+
+Development oracle: best-of-5 in hindsight on the fresh evaluation block; report as headroom only.
+
+Fresh blocks:
+
+- `27000–27399`: selector training
+- `28000–28399`: selector development
+- `29000–29399`: selector confirmation — **do not inspect**
+
+Quick uses `27000–27099` training and `28000–28019` evaluation.
 
 Run only:
 
 ```bash
-python -m aegisswarm.stochastic_training_ablation_cli --workers 14
+pytest -q
+python -m aegisswarm.strategy_selector_cli --workers 14
 ```
 
-Do not run `--full` until quick V2 is inspected.
-
-## Secondary track
-
-Best-of-5 oracle headroom is `+13.62` pp. Context-dependent strategy selection is the leading separate hypothesis if repeated-tape training does not produce a useful gain.
+Do not use `--full` until quick output is inspected.

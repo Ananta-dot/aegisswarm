@@ -33,13 +33,18 @@ ROBUST_TRAIN_WORLD_SEEDS = tuple(range(21000, 21032))
 ROBUST_DEV_SEEDS = tuple(range(22000, 22400))
 ROBUST_CONFIRM_SEEDS = tuple(range(23000, 23400))
 
-# Stochastic-training ablation V2. This cleanly isolates repeated random-tape
-# training from single-tape SimulatorV2 training while holding the executor,
-# representation, search family, structural worlds, search seeds and candidate
-# budget fixed.
+# Stochastic-training ablation V2. Quick inspection consumed 24000-24003 and
+# 25000-25019. The repeated-tape hypothesis failed; confirmation remains unused.
 STOCHASTIC_ABLATION_TRAIN_WORLD_SEEDS = tuple(range(24000, 24032))
 STOCHASTIC_ABLATION_DEV_SEEDS = tuple(range(25000, 25400))
 STOCHASTIC_ABLATION_CONFIRM_SEEDS = tuple(range(26000, 26400))
+
+# Observable strategy selector. These are fresh because the selector hypothesis
+# was motivated by inspected best-of-five oracle evidence and subsequent failed
+# stochastic-training experiments.
+SELECTOR_TRAIN_SEEDS = tuple(range(27000, 27400))
+SELECTOR_DEV_SEEDS = tuple(range(28000, 28400))
+SELECTOR_CONFIRM_SEEDS = tuple(range(29000, 29400))
 
 SPLITS = {
     "train": TRAIN_SEEDS,
