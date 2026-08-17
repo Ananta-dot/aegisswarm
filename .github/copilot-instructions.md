@@ -5,19 +5,12 @@ Before making changes, read in this order:
 1. `/AGENTS.md`
 2. `/docs/AEGISSWARM_SKILL.md`
 3. `/docs/AEGISSWARM_STATUS.md`
-4. `/OPTIMIZER_NATIVE_OBJECTIVE.md`
+4. `/ROLLING_HORIZON.md`
 
-The architecture is **not frozen**. The active branch is `agent/optimizer-native-objective` and the active protocol is `aegisswarm-optimizer-native-objective-v2`.
+The architecture is **not frozen**. `AEGISSWARM_STATUS.md` is the latest-state overlay and supersedes older current-status wording when they differ.
 
-Optimizer-native V1 is rejected. Its full development campaign on `9000–9399` produced 35.9% survival versus 78.7% for the retrained rule-objective comparator, and inspection confirmed malformed zero-centred/no-op utility semantics plus severe generalization failure. Do not rerun/tune V1 and do not treat `9000–9399` as fresh.
+Current planning state: rolling-horizon V1 completed a 400-scenario development screen with a -3.0 pp survival point estimate and substantially higher runtime. Code inspection found a receding-horizon action-deferral pathology. Planner V2 makes one targeted correction and must be evaluated on fresh development seeds `15000–15399` before any planner-aware retraining is considered.
 
-V2 shares the rule-guided structural base utility and searches smooth state-reactive modifiers. Because V2 was designed after inspecting V1, it uses fresh evidence blocks:
+Do not consume `16000–16399` confirmation, do not repurpose older reserved blocks, and do not launch planner-aware 1,800-candidate training merely because a quick screen looks positive.
 
-- development: `11000–11399`
-- reserved confirmation: `12000–12399`
-
-The old `10000–10399` block remains untouched but belongs to the abandoned V1 plan; do not silently repurpose it.
-
-Expected V2 output contains `optimizer-native-v2`, `native-v2-local`, and `optimizer_native_v2_*`. If output still says `native-local` or `optimizer_native_dev`, the checkout is stale.
-
-Do not consume confirmation, change protocol semantics mid-run, or make broad superiority claims without following the handoff/status documents.
+Do not change protocol semantics or make broad superiority claims without following the handoff documents.
