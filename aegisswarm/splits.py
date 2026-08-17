@@ -22,13 +22,31 @@ HYBRID_DEV_SEEDS = tuple(range(4000, 4400))
 # Reserved hybrid execution confirmation block.
 HYBRID_CONFIRM_SEEDS = tuple(range(7000, 7400))
 
-# Hybrid objective-learning development block. Here every searched candidate is
-# executed through the optimizer during training.
+# Hybrid objective-learning development block. This block has been consumed by
+# the optimizer-aware rule-objective development experiment.
 HYBRID_OBJECTIVE_DEV_SEEDS = tuple(range(5000, 5400))
 
-# Reserved confirmation for the optimizer-aware learned-objective architecture.
-# Do not inspect until the architecture/hyperparameters are explicitly frozen.
+# Reserved confirmation for the hybrid rule-objective architecture. Keep
+# untouched unless that exact architecture is deliberately revived and frozen.
 HYBRID_OBJECTIVE_CONFIRM_SEEDS = tuple(range(8000, 8400))
+
+# Optimizer-native V1 representation development. This block is fully consumed:
+# V1 quick and then a full 5-run campaign were inspected before the malformed
+# zero-centred utility was replaced. Never describe this block as unseen again.
+NATIVE_OBJECTIVE_DEV_SEEDS = tuple(range(9000, 9400))
+
+# Previously reserved for the invalidated V1 representation. It remains
+# untouched, but do not silently repurpose it as V2 confirmation because the V2
+# architecture was designed after inspecting the V1 development result.
+NATIVE_OBJECTIVE_CONFIRM_SEEDS = tuple(range(10000, 10400))
+
+# Fresh optimizer-native V2 development block. V2 shares the rule-guided
+# structural base utility and searches smooth state-reactive modifiers.
+NATIVE_OBJECTIVE_V2_DEV_SEEDS = tuple(range(11000, 11400))
+
+# Reserved confirmation for optimizer-native V2. Keep untouched until the V2
+# representation, hyperparameters, primary estimand and code are explicitly frozen.
+NATIVE_OBJECTIVE_V2_CONFIRM_SEEDS = tuple(range(12000, 12400))
 
 SPLITS = {
     "train": TRAIN_SEEDS,

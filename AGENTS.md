@@ -4,25 +4,24 @@ This repository is an active research project. **The architecture is not frozen.
 
 Before changing algorithms, experiments, seed splits, claims, or submission material, read in this order:
 
-1. [`docs/AEGISSWARM_SKILL.md`](docs/AEGISSWARM_SKILL.md) — canonical long-form project context, experiment ledger, methodology, deadlines, and operating rules.
-2. [`docs/AEGISSWARM_STATUS.md`](docs/AEGISSWARM_STATUS.md) — latest-result/current-decision overlay. This is newer than the skill's current-status section when they differ.
+1. [`docs/AEGISSWARM_SKILL.md`](docs/AEGISSWARM_SKILL.md) — canonical long-form history/methodology.
+2. [`docs/AEGISSWARM_STATUS.md`](docs/AEGISSWARM_STATUS.md) — latest-result/current-decision overlay; treat this as newer when current-status wording differs.
+3. [`OPTIMIZER_NATIVE_OBJECTIVE.md`](OPTIMIZER_NATIVE_OBJECTIVE.md) — active representation-ablation protocol.
 
-## Non-negotiable operating rules
+## Non-negotiable rules
 
-1. **Do not treat the current architecture as final.** We are still testing how learned strategy, local/evolutionary search, constrained optimization, rules, and later online adaptation should compose.
-2. **Do not consume reserved confirmation seeds for development.** Check the seed ledger in the handoff documents and `aegisswarm/splits.py` first.
-3. **Do not tune on a holdout after looking at it.** Once a block is inspected, it becomes development evidence and must never be described as untouched confirmation evidence.
-4. **Do not change simulator/scoring/budgets mid-protocol** unless the experiment is explicitly invalidated and restarted under a new protocol ID.
-5. **Compare components by ablation, not ideology.** Optimization, local search, RL, rules, and learned models are candidate components of AegisSwarm, not frameworks the product must defeat individually.
-6. **Use equal simulator-evaluation budgets** when comparing search methods unless the experiment explicitly studies compute scaling.
-7. **Do not overclaim.** The current environment is synthetic and abstract. Existing RL and Hungarian baselines are deliberately simple and are not state-of-the-art representatives of their entire fields.
-8. **Keep the project defensive and simulation-first.** Do not turn this repository into real-world weapon guidance, payload, targeting, interceptor engineering, or platform-specific engagement logic.
-9. **Preserve reproducibility.** Record protocol IDs, seeds, budgets, source branch/commit, output artifacts, confidence intervals, and any architecture change prompted by inspected results.
-10. **GitHub is the source of truth.** Keep the handoff/status documents updated when a major experiment finishes or the research direction changes.
+1. Architecture is not final.
+2. Never consume reserved confirmation seeds for development.
+3. Once inspected, a block is never untouched again.
+4. Do not silently change simulator/scoring/budgets inside a formal protocol.
+5. Compare components by ablation, not ideology.
+6. Use equal simulator-evaluation budgets for search/representation comparisons unless compute scaling is the experiment.
+7. Existing Hungarian and tabular-Q baselines are simple baselines, not representatives of optimization/RL generally.
+8. Keep implementation abstract, synthetic, defensive, and decision-support oriented.
+9. Record protocol IDs, seeds, budgets, source commit, artifacts, uncertainty, and architecture changes caused by inspected results.
+10. Keep the handoff/status docs current after major experiments.
 
-## Current research conclusion
-
-The completed `aegisswarm-hybrid-objective-v1` development run produced:
+## Completed hybrid-objective conclusion
 
 ```text
 fixed_optimizer: 0.320
@@ -31,14 +30,35 @@ hybrid_axplorer:  0.810
 Axplorer-local:  +0.0055, CI [-0.0235, +0.0320], p=0.507075
 ```
 
-Interpretation:
+Optimizer-aware objective search is useful; Axplorer is statistically tied with local/evolutionary search. Proposer tuning is deprioritized.
 
-- optimizer-aware strategy/objective search is useful relative to the current fixed hand-written objective;
-- Axplorer is statistically tied with optimizer-aware local/evolutionary search under the current protocol;
-- the repeated ~80–81% plateau suggests the next bottleneck is likely strategic representation and/or myopic planning, not proposer choice;
-- **architecture remains unfrozen**;
-- **do not run `8000–8399` confirmation**.
+## Optimizer-native V1 — rejected
 
-Current branch: `agent/hybrid-objective-learning`.
+The old V1 native representation completed the `9000–9399` development campaign before the V2 patch was pulled locally:
 
-Current decision: **NO FREEZE. NO CONFIRMATION. Move next toward a new representation/planning hypothesis under a new protocol.**
+```text
+fixed_optimizer: 0.310
+rule_objective:  0.787
+native_v1:       0.359
+native-rule:    -0.4280, CI [-0.4845, -0.3590], p=0.000050
+```
+
+One V1 training run reached ~0.812 survival on its 16 training scenarios while the full development mean was only 0.359. Combined with V1's malformed zero-centred utility/no-op behavior and omitted state signals, this architecture is rejected. Do not rerun or tune it. `9000–9399` is fully consumed.
+
+## Active experiment — optimizer-native V2
+
+Branch: `agent/optimizer-native-objective`  
+Protocol: `aegisswarm-optimizer-native-objective-v2`
+
+V2 shares the rule-guided positive structural base utility and learns 14 smooth state-reactive strategic modifiers. Both V2 and the 60-token rule comparator use the same local/evolutionary search family, matched seeds, budget, simulator, fitness, and Hungarian executor.
+
+Fresh V2 data:
+
+- development: `11000–11399`
+- reserved confirmation: `12000–12399`
+
+The old `10000–10399` block remains untouched but belongs to the abandoned V1 evidence plan; do not silently repurpose it.
+
+Expected V2 logs/artifacts contain `optimizer-native-v2`, `native-v2-local`, and `optimizer_native_v2_*`. If logs say `native-local` or save to `optimizer_native_dev`, the local checkout is stale.
+
+Do not run confirmation automatically after development.
