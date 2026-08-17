@@ -155,22 +155,17 @@ def decompose_oracle(metrics):
     second = np.arange(n_tapes // 2, n_tapes, dtype=int)
     all_tapes = np.arange(n_tapes, dtype=int)
 
-    # Raw one-realization hindsight comparison, analogous to the earlier oracle.
     tape0 = np.asarray([0], dtype=int)
     fixed_t0 = _global_fixed_choice(reward, tape0)
     oracle_t0_choices = _scenario_expected_choices(reward, tape0)
     fixed_t0_by_world = survival[fixed_t0, :, 0]
     oracle_t0_by_world = _chosen_values(survival, oracle_t0_choices, tape0)[:, 0]
 
-    # Same-tape expected-outcome oracle. Still optimistic because the same tapes
-    # determine and score the per-world choice, but stochastic noise is averaged.
     fixed_all = _global_fixed_choice(reward, all_tapes)
     expected_choices = _scenario_expected_choices(reward, all_tapes)
     fixed_all_by_world = survival[fixed_all, :, :].mean(axis=1)
     expected_by_world = _chosen_values(survival, expected_choices, all_tapes).mean(axis=1)
 
-    # Cross-tape estimate: use one half to identify the best program for each
-    # structural world, then evaluate that program only on the held-out half.
     choice_first = _scenario_expected_choices(reward, first)
     choice_second = _scenario_expected_choices(reward, second)
     fixed_first = _global_fixed_choice(reward, first)
@@ -193,9 +188,7 @@ def decompose_oracle(metrics):
         float(cross_gap["mean"] / raw_gap_mean) if raw_gap_mean > 1e-12 else 0.0
     )
 
-    # Tape-specific hindsight choices measure how stable the identity of the
-    # apparent best program is within the same structural world.
-    tape_choices = np.argmax(reward, axis=0).T  # [world, tape]
+    tape_choices = np.argmax(reward, axis=0)  # [world, tape]
     modal_fractions = []
     for row in tape_choices:
         counts = Counter(int(x) for x in row)
@@ -257,12 +250,7 @@ def run_oracle_decomposition(
         flush=True,
     )
 
-    metrics = evaluate_program_world_tapes(
-        programs,
-        world_seeds,
-        tape_count,
-        workers=workers,
-    )
+    metrics = evaluate_program_world_tapes(programs, world_seeds, tape_count, workers=workers)
     result = {
         "protocol_id": PROTOCOL_ID + ("-quick" if quick else "-development"),
         "world_seeds": [int(x) for x in world_seeds],
@@ -273,7 +261,7 @@ def run_oracle_decomposition(
             "Single-tape oracle uses same-realization hindsight and is intentionally optimistic.",
             "Expected oracle averages stochastic outcomes but chooses and scores on the same tapes.",
             "Cross-tape oracle chooses using one tape half and scores only on the held-out half; the reverse fold is averaged symmetrically.",
-            "Cross-tape oracle remains non-deployable because repeated outcomes for the same structural world are unavailable at deployment; it estimates stable structural specialization rather than a deployable selector.",
+            "Cross-tape oracle remains non-deployable; it estimates stable structural specialization rather than a deployable selector.",
         ],
     }
 
@@ -282,46 +270,37 @@ def run_oracle_decomposition(
     (out_dir / "results.json").write_text(json.dumps(result, indent=2))
 
     d = result["decomposition"]
-    report = [
-        "# AegisSwarm Oracle Decomposition",
-        "",
-        f"Protocol: `{result['protocol_id']}`",
-        f"Worlds: {len(world_seeds)}",
-        f"Tapes/world: {tape_count}",
-        "",
-        f"Single-tape fixed: {d['single_tape_fixed_survival']:.4f}",
-        f"Single-tape oracle: {d['single_tape_oracle_survival']:.4f}",
-        f"Cross-tape fixed: {d['cross_tape_fixed_survival']:.4f}",
-        f"Cross-tape oracle: {d['cross_tape_oracle_survival']:.4f}",
-        f"Cross-tape gap: {d['cross_tape_oracle_minus_fixed']['mean']:+.4f} CI={d['cross_tape_oracle_minus_fixed']['ci95']}",
-        f"Cross-tape choice agreement: {d['cross_tape_choice_agreement']:.4f}",
-        f"Stable fraction of raw gap: {d['stable_fraction_of_raw_oracle_gap']:.4f}",
-    ]
-    (out_dir / "REPORT.md").write_text("\n".join(report))
+    (out_dir / "REPORT.md").write_text(
+        "\n".join(
+            [
+                "# AegisSwarm Oracle Decomposition",
+                "",
+                f"Protocol: `{result['protocol_id']}`",
+                f"Worlds: {len(world_seeds)}",
+                f"Tapes/world: {tape_count}",
+                "",
+                f"Single-tape fixed: {d['single_tape_fixed_survival']:.4f}",
+                f"Single-tape oracle: {d['single_tape_oracle_survival']:.4f}",
+                f"Cross-tape fixed: {d['cross_tape_fixed_survival']:.4f}",
+                f"Cross-tape oracle: {d['cross_tape_oracle_survival']:.4f}",
+                f"Cross-tape gap: {d['cross_tape_oracle_minus_fixed']['mean']:+.4f} CI={d['cross_tape_oracle_minus_fixed']['ci95']}",
+                f"Cross-tape choice agreement: {d['cross_tape_choice_agreement']:.4f}",
+                f"Stable fraction of raw gap: {d['stable_fraction_of_raw_oracle_gap']:.4f}",
+            ]
+        )
+    )
 
     print("\n=== ORACLE DECOMPOSITION ===", flush=True)
     print(f"program mean survivals:          {[round(x, 4) for x in d['program_mean_survivals']]}", flush=True)
     print(f"single-tape fixed survival:      {d['single_tape_fixed_survival']:.3f}", flush=True)
     print(f"single-tape oracle survival:     {d['single_tape_oracle_survival']:.3f}", flush=True)
-    print(
-        f"single-tape oracle - fixed:      {d['single_tape_oracle_minus_fixed']['mean']:+.4f} "
-        f"CI={d['single_tape_oracle_minus_fixed']['ci95']}",
-        flush=True,
-    )
+    print(f"single-tape oracle - fixed:      {d['single_tape_oracle_minus_fixed']['mean']:+.4f} CI={d['single_tape_oracle_minus_fixed']['ci95']}", flush=True)
     print(f"expected fixed survival:         {d['expected_fixed_survival']:.3f}", flush=True)
     print(f"expected oracle survival:        {d['expected_oracle_survival']:.3f}", flush=True)
-    print(
-        f"expected oracle - fixed:         {d['expected_oracle_minus_fixed']['mean']:+.4f} "
-        f"CI={d['expected_oracle_minus_fixed']['ci95']}",
-        flush=True,
-    )
+    print(f"expected oracle - fixed:         {d['expected_oracle_minus_fixed']['mean']:+.4f} CI={d['expected_oracle_minus_fixed']['ci95']}", flush=True)
     print(f"cross-tape fixed survival:       {d['cross_tape_fixed_survival']:.3f}", flush=True)
     print(f"cross-tape oracle survival:      {d['cross_tape_oracle_survival']:.3f}", flush=True)
-    print(
-        f"cross-tape oracle - fixed:       {d['cross_tape_oracle_minus_fixed']['mean']:+.4f} "
-        f"CI={d['cross_tape_oracle_minus_fixed']['ci95']}",
-        flush=True,
-    )
+    print(f"cross-tape oracle - fixed:       {d['cross_tape_oracle_minus_fixed']['mean']:+.4f} CI={d['cross_tape_oracle_minus_fixed']['ci95']}", flush=True)
     print(f"cross-tape choice agreement:     {d['cross_tape_choice_agreement']:.3f}", flush=True)
     print(f"tape-oracle modal fraction:      {d['mean_tape_oracle_modal_fraction']:.3f}", flush=True)
     print(f"stable fraction of raw gap:      {d['stable_fraction_of_raw_oracle_gap']:.3f}", flush=True)
