@@ -1,11 +1,11 @@
 # AegisSwarm — Current Research Status
 
 **Updated:** 2026-08-17  
-**Architecture status:** EPISODE-LEVEL SELECTION CLOSED; HIERARCHICAL PPO ONLINE ADAPTATION ACTIVE  
+**Architecture status:** EPISODE-LEVEL SELECTION CLOSED; PPO V1 QUICK NEUTRAL; FROZEN PPO GENERALIZATION ACTIVE  
 **Active branch:** `agent/ppo-adaptive-control`  
-**Active protocol:** `aegisswarm-hierarchical-ppo-v1`
+**Active protocols:** `aegisswarm-hierarchical-ppo-v1` and `aegisswarm-hierarchical-ppo-v1-frozen-extension`
 
-Read `docs/AEGISSWARM_SKILL.md` for long-form history, `PPO_ADAPTIVE_CONTROL.md` for the active protocol, `ORACLE_DECOMPOSITION.md` for the completed oracle diagnostic, and the selector/reliability/stochastic/planning docs for closed experiments.
+Read `docs/AEGISSWARM_SKILL.md` for long-form history, `PPO_ADAPTIVE_CONTROL.md` for PPO V1, `PPO_FROZEN_EXTENSION.md` for the active no-retraining gate, and `ORACLE_DECOMPOSITION.md` for the completed oracle diagnostic.
 
 ## Current incumbent
 
@@ -15,39 +15,24 @@ Read `docs/AEGISSWARM_SKILL.md` for long-form history, `PPO_ADAPTIVE_CONTROL.md`
 + one-step RuleGuidedHungarianPolicy executor
 ```
 
-No tested proposer, compact representation, planner, reliability executor, repeated-tape training scheme, or static selector has robustly replaced this incumbent.
+No tested proposer, compact representation, planner, reliability executor, repeated-tape training scheme, static selector or RL controller has robustly replaced this incumbent.
 
-## Completed oracle decomposition — EPISODE-LEVEL SELECTION CLOSED
+## Oracle decomposition — episode-level selection closed
 
-Full frozen diagnostic used `30000–30399`, 400 structural worlds and 8 independently keyed stochastic tapes/world:
+Full frozen diagnostic on `30000–30399`, 400 structural worlds and 8 independent indexed tapes/world:
 
 ```text
-program mean survivals:          [0.7522, 0.8370, 0.8192, 0.8131, 0.8214]
-single-tape fixed survival:      0.833
-single-tape oracle survival:     0.936
-single-tape oracle - fixed:     +0.1037 CI=[+0.0825,+0.12625]
-expected fixed survival:         0.837
-expected oracle survival:        0.887
-expected oracle - fixed:        +0.0495 CI=[+0.0421875,+0.056875]
-cross-tape fixed survival:       0.837
-cross-tape oracle survival:      0.822
-cross-tape oracle - fixed:      -0.0150 CI=[-0.024375,-0.0053125]
-cross-tape choice agreement:     0.305
-tape-oracle modal fraction:      0.501
-stable fraction of raw gap:     -0.145
+single-tape oracle - fixed:      +0.1037 CI=[+0.0825,+0.12625]
+expected oracle - fixed:         +0.0495 CI=[+0.0421875,+0.056875]
+cross-tape oracle - fixed:       -0.0150 CI=[-0.024375,-0.0053125]
+cross-tape choice agreement:      0.305
 ```
 
-Decision:
+The raw ~93–94% best-of-five oracle is substantially hindsight-driven. Per-world frozen-program identity does not generalize across stochastic tapes. Episode-level preselection is closed; `31000–31399` remains untouched.
 
-- the raw `~93–94%` best-of-five oracle is a hindsight statistic strongly inflated by realization-specific stochastic outcomes;
-- the per-world best frozen program does not generalize across independent stochastic tapes;
-- episode-level frozen-program selection is closed;
-- do **not** inspect `31000–31399`; independent replication is unnecessary for this architecture decision;
-- stop using raw best-of-five survival as a realistic selector target.
+## Why online RL remains a legitimate hypothesis
 
-## Why PPO is now justified
-
-Earlier Simulator V2 evidence-hardening found:
+Simulator V2 evidence-hardening previously found:
 
 ```text
 normal incumbent:              0.801
@@ -56,17 +41,11 @@ deterministic interactions:    0.999
 interaction headroom:         +0.1980 CI=[+0.166,+0.23625]
 ```
 
-Static reliability weighting, contingent backup, rolling horizon, repeated-tape training and t=0 strategy selection did not capture that headroom robustly.
+The useful information appears during the episode: realized failures, resource depletion, overload, damage and penetrations. Hierarchical PPO therefore controls tactical mode selection online while retaining the frozen strategic program and constrained assignment layer.
 
-The oracle decomposition shows that static episode identity is also not stable. The information that can matter is instead **realized during the episode**: failed interactions, resource depletion, overload, damage and penetrations.
+## Hierarchical PPO V1 architecture
 
-Therefore the next question is:
-
-> Can a learned online controller adapt tactical behavior from realized observable state while retaining the incumbent rule program and constrained assignment layer?
-
-## Active experiment — hierarchical PPO V1
-
-PPO does **not** assign defenders directly. It chooses one of six tactical modes each simulator step:
+PPO never directly chooses defender-threat assignments. It chooses one of six tactical modes each simulator step:
 
 ```text
 0 incumbent
@@ -77,90 +56,106 @@ PPO does **not** assign defenders directly. It chooses one of six tactical modes
 5 failure_recovery
 ```
 
-All modes share frozen base program index `1` and the existing constrained one-step assignment machinery.
+All modes use frozen base program index `1`. Observations contain detected/known state plus realized history only; hidden undetected threat state, future outcomes, scenario seed and oracle information are forbidden and regression-tested.
 
-The PPO observation uses detected/known state plus realized interaction/resource history only. Undetected threat state, future outcomes, scenario seed and oracle information are forbidden. Regression tests enforce the hidden-state boundary.
-
-The reward is a scaled step-to-step difference in the established episode score. PPO uses `gamma=1.0`, making the undiscounted shaped return telescope to final established score minus the common initial score.
-
-### Fair comparators
-
-Fresh development compares:
-
-1. incumbent tactical mode;
-2. the best single fixed tactical mode selected only on PPO training/calibration seeds;
-3. PPO online adaptive switching.
-
-PPO must beat the fixed tactical comparator to establish value from online learning rather than merely discovering a better always-on mode.
-
-## Fresh PPO blocks
+Reward:
 
 ```text
-32000–32999  PPO training / tactical calibration
-33000–33399  PPO development
-34000–34399  reserved PPO confirmation — DO NOT INSPECT
+r_t = (established_score_t - established_score_{t-1}) / 10
 ```
 
-Quick V1:
+with `gamma=1.0`, so undiscounted shaped return telescopes to final established score minus the common initial score.
+
+## PPO V1 quick — neutral on survival
+
+Quick used model seeds `42101/42102`, 100,000 environment steps/model, calibration `32000–32099`, and fresh evaluation `33000–33019`.
 
 ```text
-model seeds:               42101, 42102
-training budget/model:     100,000 environment steps
-static calibration:        32000–32099
-fresh evaluation:          33000–33019
+calibrated static best mode:     4 (backup)
+incumbent survival:              0.800
+static-best survival:            0.800
+PPO adaptive survival:           0.800
+static best - incumbent:        +0.0000 CI=[-0.125,+0.125]
+PPO - incumbent:                +0.0000 CI=[-0.075,+0.075]
+PPO - static best:              +0.0000 CI=[-0.0875,+0.100]
+PPO per-run survival deltas:     [0.0,0.0]
 ```
 
-Install once:
+The learned policies are not behaviorally collapsed:
 
-```bash
-pip install -e '.[rl]'
+```text
+seed 42101: mostly conserve + failure_recovery
+seed 42102: mostly failure_recovery + reliability, with incumbent/backup use
 ```
 
-Then run:
+From the printed aggregate metric means, PPO's established score is approximately `-0.10` points versus incumbent and `+1.68` points versus always-backup. This is descriptive only because the original quick reporter did not compute row-wise score uncertainty.
+
+Decision: do **not** spend the old five-model × 500k full budget yet.
+
+## Active gate — frozen PPO generalization extension
+
+No retraining or tuning occurs. Evaluate the exact two saved quick PPO models on 100 additional untouched PPO-development scenarios:
+
+```text
+33020–33119
+```
+
+The extension reports:
+
+- incumbent / static-best / PPO survival;
+- row-wise established scalar reward;
+- hierarchical survival and reward deltas across the two training seeds;
+- per-training-run deltas;
+- interaction attempts/failures and aggregate failure rate;
+- resource exhaustion, overload and resources remaining;
+- PPO tactical-mode proportions.
+
+Run:
 
 ```bash
 pytest -q
-python -m aegisswarm.adaptive_rl_cli --workers 14
+python -m aegisswarm.adaptive_rl_frozen_cli
 ```
 
-Do **not** use `--full` until the quick output is inspected.
+No PPO training occurs in that command.
 
-## Decision gate
+## PPO evidence blocks
 
-### PPO beats incumbent and training-selected static-best
+```text
+32000–32999  PPO training / calibration
+33000–33019  PPO quick evaluation — inspected
+33020–33119  frozen-model generalization extension — active
+33120–33399  remaining PPO development
+34000–34399  PPO confirmation — DO NOT INSPECT
+```
 
-Run full development with five PPO training seeds and 500k steps/model. If the full result remains useful, freeze architecture/hyperparameters before confirmation.
+## Decision after frozen extension
 
-### PPO beats incumbent but not static-best
+### Positive survival/reward signal
 
-This is not evidence for RL adaptation. Prefer the simpler fixed mode and investigate it separately.
+Keep RL online adaptation alive, but define a fresh longer-training V2 protocol before changing the training budget. Do not simply score larger models on already-inspected evidence.
 
-### PPO ties/worsens
+### Essentially tied with incumbent
 
-Do not immediately increase model size/training budget. Inspect mode collapse and learning behavior first; close V1 if there is no credible adaptive signal.
+Close hierarchical PPO V1 at this six-mode resolution. More timesteps alone are not justified.
 
-## Evidence ledger additions
+### Worse than incumbent
 
-Consumed/inspected through this phase:
-
-- `27000–27399`, `28000–28399`: observable selector V1 full development
-- `30000–30399`: oracle decomposition full development
-
-Reserved and untouched blocks include `29000–29399`, `31000–31399`, and new PPO confirmation `34000–34399`.
+Close V1. If RL is revisited, change the learning abstraction rather than only increasing model size or rollout budget.
 
 ## Claims policy
 
 Supported development-level conclusions:
 
-- optimizer-aware 60-token rule search remains the strategic incumbent;
+- optimizer-aware 60-token rule search remains the incumbent;
 - deterministic interaction relaxation shows large synthetic headroom while perfect sensing does not;
 - reliability weighting, backup, rolling horizon, repeated-tape training and static selector variants have not robustly replaced the incumbent;
 - episode-level frozen-program selection is unstable across stochastic tapes and is closed;
-- hierarchical PPO online adaptation is a new, unproven active hypothesis.
+- PPO V1 learned nontrivial switching behavior but showed no survival advantage on the first 20 fresh scenarios.
 
 Not supported:
 
-- PPO superiority before the active experiment runs;
+- PPO superiority;
 - raw oracle performance as attainable;
 - deterministic interaction success as attainable;
 - superiority to RL or optimization generally;
