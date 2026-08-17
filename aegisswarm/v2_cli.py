@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 
 from .v2_proof import run_v2_confirmation, run_v2_development
+from .worker_compat import install_final_proof_worker_compat
 
 
 def build_parser():
@@ -50,6 +51,11 @@ def build_parser():
 
 
 def main():
+    # V1 final_proof historically reused `_evaluate_program_worker` for two
+    # different process-pool signatures. V2 installs a spawn-safe dispatcher
+    # before any training or evaluation starts so both call paths work on macOS.
+    install_final_proof_worker_compat()
+
     args = build_parser().parse_args()
     if args.confirm and args.quick:
         raise SystemExit("Choose either --quick or --confirm, not both.")
