@@ -15,6 +15,8 @@ from aegisswarm.splits import (
     NATIVE_OBJECTIVE_V2_DEV_SEEDS,
     PLANNING_CONFIRM_SEEDS,
     PLANNING_DEV_SEEDS,
+    PLANNING_V2_CONFIRM_SEEDS,
+    PLANNING_V2_DEV_SEEDS,
     V2_CONFIRM_SEEDS,
     V2_DEV_SEEDS,
 )
@@ -53,9 +55,46 @@ def test_rolling_horizon_horizon_one_returns_valid_current_plan():
     assert set(assignments) == {d.id for d in scenario.defenders}
 
 
-def test_planning_seed_blocks_are_fresh():
-    dev = set(PLANNING_DEV_SEEDS)
-    confirm = set(PLANNING_CONFIRM_SEEDS)
+def test_v2_does_not_inflate_future_value_for_currently_feasible_pair():
+    # This directly guards the V1 receding-horizon procrastination mechanism.
+    tokens = np.full(PROGRAM_LENGTH, 15, dtype=np.int16)
+    scenario = ScenarioGenerator().generate(seed=91)
+    for threat in scenario.threats:
+        threat.detected = True
+
+    policy = RuleGuidedRollingHorizonPolicy(
+        tokens,
+        horizon=4,
+        discount=0.90,
+        time_limit_seconds=1.0,
+    )
+    _, _, variables = policy._candidate_variables(scenario)
+
+    grouped = {}
+    for var in variables:
+        key = (var["defender_index"], var["threat_index"])
+        grouped.setdefault(key, []).append(var)
+
+    checked = 0
+    for vars_for_pair in grouped.values():
+        by_h = {v["h"]: v for v in vars_for_pair}
+        if 0 not in by_h:
+            continue
+        current = by_h[0]
+        if not current["current_positive"]:
+            continue
+        for h, future in by_h.items():
+            if h == 0:
+                continue
+            assert future["utility"] <= current["utility"] + 1e-12
+            checked += 1
+
+    assert checked > 0
+
+
+def test_planning_v2_seed_blocks_are_fresh():
+    dev = set(PLANNING_V2_DEV_SEEDS)
+    confirm = set(PLANNING_V2_CONFIRM_SEEDS)
     previous = (
         set(FINAL_HOLDOUT_SEEDS)
         | set(V2_DEV_SEEDS)
@@ -68,12 +107,14 @@ def test_planning_seed_blocks_are_fresh():
         | set(NATIVE_OBJECTIVE_CONFIRM_SEEDS)
         | set(NATIVE_OBJECTIVE_V2_DEV_SEEDS)
         | set(NATIVE_OBJECTIVE_V2_CONFIRM_SEEDS)
+        | set(PLANNING_DEV_SEEDS)
+        | set(PLANNING_CONFIRM_SEEDS)
     )
-    assert len(PLANNING_DEV_SEEDS) == 400
-    assert PLANNING_DEV_SEEDS[0] == 13000
-    assert PLANNING_DEV_SEEDS[-1] == 13399
-    assert len(PLANNING_CONFIRM_SEEDS) == 400
-    assert PLANNING_CONFIRM_SEEDS[0] == 14000
-    assert PLANNING_CONFIRM_SEEDS[-1] == 14399
+    assert len(PLANNING_V2_DEV_SEEDS) == 400
+    assert PLANNING_V2_DEV_SEEDS[0] == 15000
+    assert PLANNING_V2_DEV_SEEDS[-1] == 15399
+    assert len(PLANNING_V2_CONFIRM_SEEDS) == 400
+    assert PLANNING_V2_CONFIRM_SEEDS[0] == 16000
+    assert PLANNING_V2_CONFIRM_SEEDS[-1] == 16399
     assert dev.isdisjoint(previous | confirm)
     assert confirm.isdisjoint(previous)
