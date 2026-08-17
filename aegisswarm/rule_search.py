@@ -33,10 +33,13 @@ def evaluate_rule_program(tokens, config: EvalConfig):
 
     survival = float(np.mean([r["asset_survival_rate"] for r in rows]))
     containment = float(np.mean([r["containment_rate"] for r in rows]))
+    penetrations = float(np.mean([r["penetrations"] for r in rows]))
     damage = float(np.mean([r["cumulative_damage"] for r in rows]))
     resources = float(np.mean([r["defenders_consumed"] for r in rows]))
     response = float(np.mean([r["mean_response_delay"] for r in rows]))
 
+    # Keep the V1/V2 search objective unchanged. Penetrations is exposed as an
+    # additional diagnostic/archive metric only; it is not added to fitness.
     loss = (
         100.0 * (1.0 - survival)
         + 40.0 * (1.0 - containment)
@@ -50,6 +53,7 @@ def evaluate_rule_program(tokens, config: EvalConfig):
         "loss": float(loss),
         "asset_survival_rate": survival,
         "containment_rate": containment,
+        "penetrations": penetrations,
         "cumulative_damage": damage,
         "defenders_consumed": resources,
         "mean_response_delay": response,
