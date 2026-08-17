@@ -1,24 +1,15 @@
 # AegisSwarm coding-agent instructions
 
-Read before changes:
+Read first:
 
 1. `/AGENTS.md`
 2. `/docs/AEGISSWARM_SKILL.md`
 3. `/docs/AEGISSWARM_STATUS.md`
-4. `/RELIABILITY_AWARE.md`
-5. `/EVIDENCE_HARDENING.md`
+4. `/EVIDENCE_HARDENING.md`
+5. `/RELIABILITY_AWARE.md`
 6. `/ROLLING_HORIZON.md` for completed planner history
 
-Architecture is not frozen for external claims. `AEGISSWARM_STATUS.md` is the current-state overlay.
-
-Active branch/protocol:
-
-```text
-agent/reliability-aware-assignment
-aegisswarm-reliability-aware-screen-v1
-```
-
-Incumbent entering this screen:
+Current incumbent:
 
 ```text
 60-token state-reactive rules
@@ -26,29 +17,20 @@ Incumbent entering this screen:
 + one-step RuleGuidedHungarianPolicy
 ```
 
-Completed SimulatorV2 headroom development on `17000–17399` found:
+Completed Simulator V2 headroom development found essentially zero perfect-sensing headroom but large deterministic-interaction diagnostic headroom (`+19.8` pp, CI entirely positive).
+
+The reliability-aware executor screen is also complete:
 
 ```text
-normal incumbent:           0.801
-perfect sensing:            0.801
-interaction deterministic:  0.999
-best-of-5 oracle:            0.938
-interaction headroom:      +0.1980 CI=[0.166,0.23625]
+incumbent:             0.809
+weighted:              0.810
+contingent backup:     0.825
+weighted-incumbent:   +0.0003 CI=[-0.0165,+0.01775]
+backup-incumbent:     +0.0155 CI=[-0.00625,+0.03575625]
 ```
 
-This motivates reliability-aware allocation. Deterministic success is only a diagnostic relaxation, not a deployable assumption.
+Do not treat backup as the incumbent and do not consume `20000–20399` confirmation. Weighting-only is a null result; backup is only a weak positive.
 
-The active screen compares frozen programs under:
+Next direction: stochastic-robust 60-token strategy training under Simulator V2 with multiple matched random tapes per structural scenario. The first version should retain the existing scalar fitness averaged over replications; do not introduce CVaR/risk weights yet. Compare incumbent-executor and backup-executor training under matched search budgets. Do not reopen Axplorer, optimizer-native V3, rolling-horizon V3, or sensing work by default.
 
-- incumbent one-to-one Hungarian;
-- reliability-weighted one-to-one Hungarian;
-- reliability-aware contingent backup allocation with at most two defenders per threat.
-
-Fresh blocks:
-
-- `19000–19399`: development
-- `20000–20399`: reserved confirmation; do not inspect
-
-Do not repurpose `18000–18399`; it belongs to the completed evidence-hardening protocol.
-
-Do not reopen optimizer-native or rolling-horizon V3 by default. Do not change simulator/scoring/protocol semantics mid-screen. Keep work abstract, synthetic, defensive, and decision-support oriented.
+Legacy `Simulator` and `SimulatorV2` are separate protocol generations. Never silently mix them in a claim.
