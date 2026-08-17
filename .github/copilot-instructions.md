@@ -1,23 +1,24 @@
 # AegisSwarm coding-agent instructions
 
-Before making changes, read in this order:
+Read before changes:
 
 1. `/AGENTS.md`
 2. `/docs/AEGISSWARM_SKILL.md`
 3. `/docs/AEGISSWARM_STATUS.md`
-4. `/EVIDENCE_HARDENING.md`
-5. `/ROLLING_HORIZON.md` for completed planner history
+4. `/RELIABILITY_AWARE.md`
+5. `/EVIDENCE_HARDENING.md`
+6. `/ROLLING_HORIZON.md` for completed planner history
 
-The architecture is **not frozen for external claims**. `AEGISSWARM_STATUS.md` is the latest-state overlay and supersedes older current-status wording when they differ.
+Architecture is not frozen for external claims. `AEGISSWARM_STATUS.md` is the current-state overlay.
 
 Active branch/protocol:
 
 ```text
-agent/evidence-hardening
-aegisswarm-evidence-hardening-v1
+agent/reliability-aware-assignment
+aegisswarm-reliability-aware-screen-v1
 ```
 
-Current incumbent:
+Incumbent entering this screen:
 
 ```text
 60-token state-reactive rules
@@ -25,15 +26,29 @@ Current incumbent:
 + one-step RuleGuidedHungarianPolicy
 ```
 
-Do not reopen optimizer-native V3 or rolling-horizon V3 by default. Those tracks were closed by controlled development evidence.
+Completed SimulatorV2 headroom development on `17000–17399` found:
 
-The active phase introduces an opt-in `SimulatorV2` with policy-independent indexed random draws and a frozen-program headroom suite. Legacy `Simulator` remains untouched. Never silently mix simulator generations in one claim.
+```text
+normal incumbent:           0.801
+perfect sensing:            0.801
+interaction deterministic:  0.999
+best-of-5 oracle:            0.938
+interaction headroom:      +0.1980 CI=[0.166,0.23625]
+```
 
-Evidence blocks:
+This motivates reliability-aware allocation. Deterministic success is only a diagnostic relaxation, not a deployable assumption.
 
-- `17000–17399`: development
-- `18000–18399`: reserved evidence/confirmation; do not inspect during development
+The active screen compares frozen programs under:
 
-Diagnostic perfect-sensing, deterministic-interaction, combined, and best-of-5 oracle results are **development headroom probes**, not deployable assumptions or mathematical upper bounds.
+- incumbent one-to-one Hungarian;
+- reliability-weighted one-to-one Hungarian;
+- reliability-aware contingent backup allocation with at most two defenders per threat.
 
-Do not change protocol semantics or make broad superiority claims without following the handoff documents.
+Fresh blocks:
+
+- `19000–19399`: development
+- `20000–20399`: reserved confirmation; do not inspect
+
+Do not repurpose `18000–18399`; it belongs to the completed evidence-hardening protocol.
+
+Do not reopen optimizer-native or rolling-horizon V3 by default. Do not change simulator/scoring/protocol semantics mid-screen. Keep work abstract, synthetic, defensive, and decision-support oriented.
