@@ -203,6 +203,7 @@ def run_hybrid_objective_development(
         "evaluation_count": int(len(eval_seeds)),
         "device": str(device),
         "workers": int(workers),
+        "architecture_frozen": False,
     }
     _save_json(out_dir / "protocol.json", protocol)
 
@@ -274,6 +275,25 @@ def run_hybrid_objective_confirmation(
     workers=4,
 ):
     source_dir = Path(source_dir)
+    source_protocol_path = source_dir / "protocol.json"
+    if not source_protocol_path.exists():
+        raise FileNotFoundError(
+            f"Missing development protocol at {source_protocol_path}; run full development first."
+        )
+
+    source_protocol = json.loads(source_protocol_path.read_text())
+    expected_protocol = PROTOCOL_ID + "-development"
+    if source_protocol.get("protocol_id") != expected_protocol:
+        raise RuntimeError(
+            "Confirmation requires the full development protocol, not quick or unrelated artifacts."
+        )
+    if source_protocol.get("architecture_frozen") is not True:
+        raise RuntimeError(
+            "Hybrid-objective architecture is not frozen. Review development results first, "
+            "then explicitly set architecture_frozen=true in the development protocol before "
+            "consuming confirmation seeds 8000-8399."
+        )
+
     runs_dir = source_dir / "runs"
     local_runs = []
     ax_runs = []
@@ -294,6 +314,7 @@ def run_hybrid_objective_confirmation(
         {
             "protocol_id": PROTOCOL_ID + "-confirmation",
             "source_dir": str(source_dir),
+            "source_development_protocol": expected_protocol,
             "search_seeds": list(SEARCH_SEEDS),
             "confirmation_first_seed": int(HYBRID_OBJECTIVE_CONFIRM_SEEDS[0]),
             "confirmation_last_seed": int(HYBRID_OBJECTIVE_CONFIRM_SEEDS[-1]),
