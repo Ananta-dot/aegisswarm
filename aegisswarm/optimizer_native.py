@@ -31,8 +31,9 @@ OBJECTIVE_DIM = len(PARAM_NAMES)
 LOWER_BOUNDS = np.asarray([0.0, 0.0, -1.0, -1.0, -4.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 UPPER_BOUNDS = np.asarray([8.0, 4.0, 4.0, 4.0, 1.0, 4.0, 4.0, 0.8, 4.0, 4.0])
 
-# A hand-written starting point only. Search is free to move anywhere inside the
-# abstract bounds. This is not intended to encode real-world doctrine.
+# Diagnostic/default vector for smoke tests and direct policy use. It is NOT
+# injected into the representation-search population; both searched
+# representations begin from stochastic candidates under matched search seeds.
 DEFAULT_NATIVE_OBJECTIVE = np.asarray(
     [3.0, 1.0, 1.0, 0.8, -1.5, 1.5, 1.0, 0.20, 0.5, 0.5],
     dtype=float,
@@ -304,8 +305,7 @@ def train_native_local(
 ):
     rng = np.random.default_rng(int(search_seed))
     population = int(population)
-    vectors = [DEFAULT_NATIVE_OBJECTIVE.copy()]
-    vectors += [random_objective(rng) for _ in range(max(0, population - 1))]
+    vectors = [random_objective(rng) for _ in range(population)]
     started = time.perf_counter()
     history = []
 
