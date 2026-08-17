@@ -14,9 +14,17 @@ FINAL_HOLDOUT_SEEDS = tuple(range(2100, 2500))
 # every V1 evaluation block. Results here may guide V2 development.
 V2_DEV_SEEDS = tuple(range(3000, 3400))
 
+# Hybrid-architecture development block. This is separate from V2 development so
+# executor/optimizer changes can be diagnosed without reusing the V2 dev set.
+HYBRID_DEV_SEEDS = tuple(range(4000, 4400))
+
 # Reserved V2 confirmation block. Do not inspect or evaluate these seeds until
 # the V2 architecture and hyperparameters have been frozen after development.
 V2_CONFIRM_SEEDS = tuple(range(6000, 6400))
+
+# Reserved confirmation block for the eventual hybrid architecture. Do not use
+# this block during hybrid architecture or hyperparameter development.
+HYBRID_CONFIRM_SEEDS = tuple(range(7000, 7400))
 
 SPLITS = {
     "train": TRAIN_SEEDS,
