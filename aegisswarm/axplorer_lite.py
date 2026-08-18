@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -12,7 +11,6 @@ from .strategy import GENE_LEVELS, GENOME_LENGTH, random_genome
 from .scoring import EvalConfig, evaluate_genome
 from .local_search import hill_climb
 
-
 BOS = GENE_LEVELS
 EOS = GENE_LEVELS + 1
 PAD = GENE_LEVELS + 2
@@ -21,10 +19,11 @@ SEQ_LEN = GENOME_LENGTH + 2
 
 
 class GenomeTransformer(nn.Module):
-    def __init__(self, d_model=96, nhead=4, layers=3):
+    def __init__(self, d_model=96, nhead=4, layers=3, max_genome_length=GENOME_LENGTH):
         super().__init__()
+        self.max_genome_length = int(max_genome_length)
         self.tok = nn.Embedding(VOCAB_SIZE, d_model)
-        self.pos = nn.Embedding(SEQ_LEN, d_model)
+        self.pos = nn.Embedding(self.max_genome_length + 2, d_model)
         block = nn.TransformerEncoderLayer(
             d_model=d_model,
             nhead=nhead,
@@ -37,7 +36,9 @@ class GenomeTransformer(nn.Module):
         self.head = nn.Linear(d_model, VOCAB_SIZE)
 
     def forward(self, x):
-        b, t = x.shape
+        _b, t = x.shape
+        if t > self.max_genome_length + 1:
+            raise ValueError("Sequence exceeds configured genome length")
         pos = torch.arange(t, device=x.device).unsqueeze(0)
         h = self.tok(x) + self.pos(pos)
         mask = torch.triu(
@@ -81,7 +82,7 @@ def train_model(model, genomes, steps=300, batch_size=32, lr=3e-4, device="cpu",
 
 
 @torch.no_grad()
-def sample_genomes(model, n, temperature=0.8, device="cpu", seed=0):
+def sample_genomes(model, n, temperature=0.8, device="cpu", seed=0, genome_length=GENOME_LENGTH):
     torch.manual_seed(seed)
     model.eval()
     out = []
@@ -90,7 +91,7 @@ def sample_genomes(model, n, temperature=0.8, device="cpu", seed=0):
         seq = torch.tensor([[BOS]], dtype=torch.long, device=device)
         genes = []
 
-        for _step in range(GENOME_LENGTH):
+        for _step in range(int(genome_length)):
             logits = model(seq)[:, -1, :GENE_LEVELS] / max(temperature, 1e-4)
             probs = torch.softmax(logits, dim=-1)
             token = int(torch.multinomial(probs, 1).item())
@@ -130,7 +131,7 @@ def train_axplorer_style(
 ):
     rng = np.random.default_rng(seed)
     device = device or device_auto()
-    model = GenomeTransformer().to(device)
+    model = GenomeTransformer(max_genome_length=GENOME_LENGTH).to(device)
 
     population_data = [random_genome(rng) for _ in range(population)]
     history = []
@@ -156,6 +157,7 @@ def train_axplorer_style(
             temperature=temperature,
             device=device,
             seed=seed + 10_000 + epoch,
+            genome_length=GENOME_LENGTH,
         )
 
         improved = []
@@ -176,7 +178,7 @@ def train_axplorer_style(
         while len(population_data) < population:
             population_data.append(random_genome(rng))
 
-        best_fitness, best_genome = rescored[0]
+        _best_fitness, best_genome = rescored[0]
         best_metrics = evaluate_genome(best_genome, config)
         history.append({
             "epoch": int(epoch),
