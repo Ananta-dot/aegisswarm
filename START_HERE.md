@@ -1,11 +1,11 @@
 # START HERE
 
-You only need this repository now. Ignore the earlier M1–M5 ZIPs.
+This repository is the single source of truth. Ignore the earlier M1–M5 ZIPs.
 
-## One-time setup
+## Update and setup
 
 ```bash
-cd aegisswarm_full
+git pull
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -19,48 +19,48 @@ pytest -q
 python -m aegisswarm.cli smoke
 ```
 
-## Run the entire pipeline quickly
+## Recommended: test the new adaptive search quickly
+
+```bash
+bash scripts/run_v2_quick.sh
+```
+
+This exercises the adaptive 20-gene policy, staged training evaluation, transformer proposals, local refinement, validation-ranked hall of fame, champion decoding, and a small held-out test evaluation.
+
+## Then run the serious policy search
+
+```bash
+bash scripts/run_v2.sh
+```
+
+Main outputs:
+
+```text
+artifacts/policy_v2.json       # champion + archive + search history
+artifacts/policy_v2.pt         # transformer state
+artifacts/policy_v2_test.json  # final held-out champion result
+```
+
+## Useful individual commands
+
+```bash
+python -m aegisswarm.cli search-v2 --quick
+python -m aegisswarm.cli decode-v2 --genome artifacts/policy_v2.json
+python -m aegisswarm.cli prove-v2 --genome artifacts/policy_v2.json --episodes 500
+```
+
+The old v1 pipeline remains available with:
 
 ```bash
 python -m aegisswarm.cli all --quick
-```
-
-This validates:
-- simulator
-- heuristic baselines
-- optimization baseline
-- sequential RL baseline
-- Axplorer-style transformer search
-- held-out comparison
-
-## Then run the serious experiment
-
-```bash
 bash scripts/run_full.sh
-```
-
-That creates the final experiment artifacts under `artifacts/`.
-
-## Start the demo
-
-```bash
-python -m aegisswarm.cli serve --host 127.0.0.1 --port 8000
-```
-
-Open:
-
-```text
-http://127.0.0.1:8000
 ```
 
 ## Important workflow
 
-Do not keep rebuilding/setup-ing stages individually.
-
-From now on:
 1. keep this repository as the single source of truth;
-2. modify it in place;
-3. use Git for checkpoints;
-4. run `pytest -q` after changes;
-5. use `all --quick` for integration checks;
-6. use `scripts/run_full.sh` only for serious benchmark runs.
+2. modify it in place and use Git for checkpoints;
+3. run `pytest -q` after changes;
+4. use `scripts/run_v2_quick.sh` for integration checks;
+5. use `scripts/run_v2.sh` for serious policy-discovery runs;
+6. do not use held-out test scores to tune the policy.
