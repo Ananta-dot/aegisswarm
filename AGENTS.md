@@ -6,13 +6,14 @@ Read in order before changing algorithms, protocols, seeds, or claims:
 
 1. `docs/AEGISSWARM_SKILL.md` — long-form history.
 2. `docs/AEGISSWARM_STATUS.md` — latest-state overlay; supersedes older current wording.
-3. `ORACLE_DECOMPOSITION.md` — active diagnostic.
-4. `STRATEGY_SELECTOR.md` — closed selector protocol.
-5. `STOCHASTIC_TRAINING_ABLATION.md` — closed repeated-tape V2.
-6. `STOCHASTIC_ROBUST.md` — closed robust-training V1.
-7. `EVIDENCE_HARDENING.md` — completed Simulator V2/headroom protocol.
-8. `RELIABILITY_AWARE.md` — completed reliability-executor screen.
-9. `ROLLING_HORIZON.md` — completed planner history.
+3. `PPO_ADAPTIVE_CONTROL.md` — active online-adaptation protocol.
+4. `ORACLE_DECOMPOSITION.md` — completed oracle decomposition.
+5. `STRATEGY_SELECTOR.md` — closed selector protocol.
+6. `STOCHASTIC_TRAINING_ABLATION.md` — closed repeated-tape V2.
+7. `STOCHASTIC_ROBUST.md` — closed robust-training V1.
+8. `EVIDENCE_HARDENING.md` — completed Simulator V2/headroom protocol.
+9. `RELIABILITY_AWARE.md` — completed reliability-executor screen.
+10. `ROLLING_HORIZON.md` — completed planner history.
 
 ## Non-negotiable rules
 
@@ -27,6 +28,8 @@ Read in order before changing algorithms, protocols, seeds, or claims:
 9. Do not run confirmation merely because a quick or development point estimate is positive.
 10. Legacy `Simulator` and `SimulatorV2` are different protocol generations; label them explicitly.
 11. Do not treat hindsight oracle performance as deployable or predictable without held-out stochastic evidence.
+12. RL observations must never expose undetected threat state, scenario seed, future outcomes or oracle information.
+13. PPO V1 must not directly choose combinatorial defender-threat assignments; the constrained assignment layer remains underneath the RL controller.
 
 ## Current incumbent
 
@@ -36,67 +39,96 @@ Read in order before changing algorithms, protocols, seeds, or claims:
 + one-step RuleGuidedHungarianPolicy
 ```
 
-No tested proposer, compact representation, planner, reliability executor, repeated-tape training scheme, or t=0 selector has robustly replaced it.
+No tested proposer, compact representation, planner, reliability executor, repeated-tape training scheme, or static selector has robustly replaced it.
 
-## Closed selector V1
+## Completed oracle decomposition — selection closed
 
-Full development on `28000–28399`:
-
-```text
-fixed best survival:      0.8275
-selector survival:        0.8113
-selector-fixed:          -0.0163 CI=[-0.0350,+0.0025]
-selector-fixed reward:   -2.960 CI=[-5.3340,-0.6094]
-raw hindsight oracle:     0.9338
-```
-
-Do not inspect `29000–29399` and do not tune selector model families against this development block by default.
-
-## Active phase — oracle decomposition V1
-
-Branch: `agent/oracle-decomposition`  
-Protocol: `aegisswarm-oracle-decomposition-v1`
-
-No policy is trained or changed. The same five frozen programs are evaluated on repeated indexed stochastic tapes of the same structural worlds.
-
-### Quick result — completed
-
-Fresh `30000–30019`, four tapes/world:
+Full `30000–30399`, 400 worlds × 8 tapes/world:
 
 ```text
-single-tape oracle-fixed:       +0.0500 CI=[0.0000,+0.1250]
-expected oracle-fixed:          +0.0625 CI=[+0.01875,+0.10625]
-cross-tape oracle-fixed:        -0.0312 CI=[-0.0875,+0.03125]
-cross-tape choice agreement:     0.450
-tape-oracle modal fraction:      0.575
-stable fraction of raw gap:     -0.625
+single-tape oracle-fixed:       +0.1037 CI=[+0.0825,+0.12625]
+expected oracle-fixed:          +0.0495 CI=[+0.0421875,+0.056875]
+cross-tape oracle-fixed:        -0.0150 CI=[-0.024375,-0.0053125]
+cross-tape choice agreement:     0.305
+tape-oracle modal fraction:      0.501
 ```
 
-Interpretation: the apparent best-program advantage is strong when selection and scoring reuse the same stochastic outcomes, but does not generalize to held-out tapes in the quick sample. Best-program identity is unstable. This is evidence that the old ~93–94% raw oracle substantially mixes structural specialization with stochastic luck.
+Decision:
 
-### Full development — authorized
+- raw best-of-five performance is substantially hindsight-driven;
+- per-world program identity does not generalize across independent tapes;
+- episode-level frozen-program selection is closed;
+- do not inspect `31000–31399` and do not build another static selector by default.
 
-Because only 20 worlds were used in quick and the cross-tape CI remains wide, run the exact frozen diagnostic on:
+## Active phase — hierarchical PPO online adaptation V1
+
+Branch: `agent/ppo-adaptive-control`  
+Protocol: `aegisswarm-hierarchical-ppo-v1`
+
+Motivation: Simulator V2 deterministic-interaction relaxation previously showed approximately `+19.8 pp` synthetic headroom, while static reliability/planning/training/selector changes did not capture it. Online RL is now justified because it can react to **realized** failures and resource state rather than predicting stochastic outcomes in advance.
+
+### Architecture
 
 ```text
-30000–30399   400 structural worlds
-8 independent indexed tapes/world
-5 frozen programs
+observable detected/known state + realized history
+    -> PPO chooses tactical mode
+    -> frozen base rule program index 1
+    -> constrained assignment layer
+    -> Simulator V2 outcome
+    -> repeat
 ```
 
-Run:
+PPO action space:
+
+```text
+0 incumbent
+1 urgency
+2 conserve
+3 reliability
+4 backup
+5 failure_recovery
+```
+
+The fixed tactical comparator is chosen by mean established reward on PPO training/calibration seeds only. PPO must beat both incumbent and that fixed comparator to establish online-learning value.
+
+Reward is a scaled difference in the existing established episode score; `gamma=1.0` preserves telescoping of the undiscounted shaped return.
+
+### Fresh blocks
+
+```text
+32000–32999  training/calibration
+33000–33399  development
+34000–34399  confirmation — DO NOT INSPECT
+```
+
+Quick:
+
+```text
+model seeds:            42101, 42102
+100k env steps/model
+calibration:            32000–32099
+evaluation:             33000–33019
+```
+
+Install optional dependencies once:
+
+```bash
+pip install -e '.[rl]'
+```
+
+Then run only:
 
 ```bash
 pytest -q
-python -m aegisswarm.oracle_decomposition_cli --full --workers 14
+python -m aegisswarm.adaptive_rl_cli --workers 14
 ```
 
-Do not inspect `31000–31399`; that is reserved independent replication.
+Do not use `--full` until quick output is inspected.
 
-### Decision after full
+### Quick decision
 
-- Cross-tape gap near zero/negative: close episode-level frozen-program selection and stop using raw oracle survival as a performance target.
-- Cross-tape gap materially positive with stable choices: only then justify richer/later-state gating.
-- Same-tape oracle large but cross-tape weak: classify the raw gap primarily as stochastic hindsight.
+- PPO > incumbent and static-best: authorize full development.
+- PPO > incumbent but <= static-best: no evidence for adaptation; prefer simpler fixed mode.
+- PPO ties/worsens: inspect mode collapse/learning behavior before any larger model or budget; close V1 if no adaptive signal.
 
-If selection closes, the next performance phase should target online state adaptation / uncertainty-aware sequential control or broader stress-regime benchmarking, not another static selector.
+Do not claim PPO or RL superiority from this protocol alone.

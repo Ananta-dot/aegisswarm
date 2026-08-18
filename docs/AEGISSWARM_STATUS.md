@@ -1,148 +1,315 @@
 # AegisSwarm — Current Research Status
 
-**Updated:** 2026-08-17  
-**Architecture status:** SELECTOR V1 FAILED; ORACLE DECOMPOSITION QUICK SHOWS NO STABLE SELECTION HEADROOM  
-**Active branch:** `agent/oracle-decomposition`  
-**Active protocol:** `aegisswarm-oracle-decomposition-v1`
+**Updated:** 2026-08-17
+**Architecture:** NOT FROZEN. The current incumbent is a comparison anchor, not the final architecture.
+**Current branch:** `agent/ppo-adaptive-control`
+**External deadline recorded in canonical skill:** 2026-09-30 23:59 +05:30
 
-Read `docs/AEGISSWARM_SKILL.md` for long-form history, `ORACLE_DECOMPOSITION.md` for the active diagnostic, `STRATEGY_SELECTOR.md` for the closed selector experiment, `EVIDENCE_HARDENING.md` for Simulator V2 headroom evidence, and the reliability/stochastic/planning docs for prior closed experiments.
+For full historical context, read `docs/AEGISSWARM_SKILL.md`. For PPO details read `PPO_ADAPTIVE_CONTROL.md` and `PPO_FROZEN_EXTENSION.md`.
 
-## Incumbent architecture
+## Mission
+
+AegisSwarm is a simulation-first research platform for adaptive defensive resource allocation under stochastic, partially observed threat interactions. The research target is a robust **decision/coordination architecture**, not a claim that one framework defeats all other frameworks.
+
+The architecture is deliberately open. Structured rules, optimization, local/evolutionary search, Axplorer, reliability mechanisms, planning, RL/PPO, and hybrids are all candidate components. Use them together when complementary; compare them in controlled ablations when attribution matters.
+
+## Current incumbent
 
 ```text
-60-token state-reactive rule representation
+60-token state-reactive structured rule representation
 + optimizer-aware local/evolutionary offline search
 + one-step RuleGuidedHungarianPolicy executor
 ```
 
-No tested proposer, compact representation, planner, reliability executor, repeated-tape training protocol, or t=0 observable selector has robustly replaced this incumbent.
+No tested alternative has robustly replaced this incumbent yet. This does **not** mean optimization/RL/evolutionary search are being rejected; they remain possible components of the final architecture.
 
-## Completed selector V1 — FAILED
+## Major evidence so far
 
-Full selector training used `27000–27399`; development evaluation used fresh `28000–28399`:
+### Conventional baselines / early learning
 
-```text
-fixed best program index:         1
-fresh program survivals:          [0.7400, 0.8275, 0.81375, 0.81875, 0.8300]
-fixed best survival:              0.8275
-selector survival:                0.8113
-oracle survival:                  0.9338
-selector - fixed:                -0.0163 CI=[-0.0350,+0.0025]
-selector - fixed reward:         -2.960 CI=[-5.3340,-0.6094]
-oracle gap captured:             -0.153
-selector/oracle agreement:        0.310
-```
-
-Decision:
-
-- the t=0 observable ridge selector underperformed the training-selected fixed strategy;
-- the scalar-reward CI is entirely negative;
-- do **not** inspect `29000–29399` confirmation;
-- do not tune ridge alpha/features/model complexity on this development block by default.
-
-## Oracle decomposition quick — STRONG EVIDENCE AGAINST STABLE EPISODE-LEVEL SPECIALIZATION
-
-Quick diagnostic used fresh structural worlds `30000–30019`, four independently keyed stochastic tapes per world, and the same five frozen incumbent programs.
+Approximate development survival:
 
 ```text
-program mean survivals:          [0.7438, 0.8375, 0.8125, 0.7750, 0.8125]
-single-tape fixed survival:      0.925
-single-tape oracle survival:     0.975
-single-tape oracle - fixed:     +0.0500 CI=[0.0000,+0.1250]
-expected fixed survival:         0.8375
-expected oracle survival:        0.9000
-expected oracle - fixed:        +0.0625 CI=[+0.01875,+0.10625]
-cross-tape fixed survival:       0.8375
-cross-tape oracle survival:      0.8063
-cross-tape oracle - fixed:      -0.0312 CI=[-0.0875,+0.03125]
-cross-tape choice agreement:     0.450
-tape-oracle modal fraction:      0.575
-stable fraction of raw gap:     -0.625
+random             0.320
+closest            0.260
+highest_risk       0.340
+greedy_risk_cost    0.315
+Hungarian           0.305
+Q-learning          0.355
+legacy local        0.745
+legacy Axplorer     0.580
 ```
 
-Interpretation:
+Structured rule search substantially improved on these baselines.
 
-- same-tape hindsight remains optimistic;
-- averaging several tapes and choosing/scoring on those same tapes still produces an optimistic `+6.25 pp` gap;
-- the primary held-out-tape estimate is instead negative (`-3.12 pp`) and its CI spans zero;
-- only `45%` of per-world best-program choices agree between tape halves;
-- the typical tape-specific oracle choice is only modestly stable (`57.5%` modal fraction);
-- this quick evidence strongly suggests that much of the earlier `~93–94%` best-of-five oracle is realization-specific stochastic luck rather than stable structural specialization that an episode-level selector could learn.
+### Structured rule / Axplorer search
 
-The negative stable-fraction statistic should not be interpreted literally as “negative headroom”; it means the held-out estimate reversed sign relative to the optimistic same-realization gap.
+The structured 60-token representation became the strong comparator. Axplorer repeatedly showed positive point estimates but no robust enough advantage to justify replacing local/evolutionary search as the default proposer.
 
-## Why the full decomposition is still authorized
-
-Unlike a failed policy quick screen, this is an evidence diagnostic whose purpose is to decide whether strategy-selection headroom exists at all. Twenty worlds are too few to permanently close a research direction based on a held-out CI of `[-8.75,+3.125] pp`.
-
-Therefore the exact protocol is frozen and the full **development diagnostic** is authorized:
+A representative development comparison:
 
 ```text
-400 structural worlds: 30000–30399
-8 independent indexed tapes/world
-5 frozen programs
+rule_local:       ~0.794
+Axplorer V2:      ~0.810
 ```
 
-Run:
+The correct conclusion is not 'Axplorer is bad'; it is that its incremental benefit is not yet established under the completed protocols.
 
-```bash
-python -m aegisswarm.oracle_decomposition_cli --full --workers 14
+### Optimizer-aware objective search
+
+The major architectural lesson is that strategies should be evaluated **through the optimizer they will actually use**. Swapping an optimizer underneath strategies trained for another executor did not help.
+
+Hybrid objective development:
+
+```text
+fixed optimizer: 0.320
+hybrid local:    0.805 CI=[0.7762,0.8310]
+hybrid Axplorer: 0.810 CI=[0.7778,0.8410]
 ```
 
-Do not inspect the independent replication block `31000–31399`.
+Thus optimizer-aware strategy search is important; Axplorer versus local/evolutionary search is still unresolved/tied.
 
-## Full-development decision gate
+### Reliability / backup
 
-### Cross-tape gap remains near zero or negative
+400-scenario development:
 
-Close episode-level frozen-program selection as a performance path. Stop using raw `93–94%` oracle survival as a realistic target. The incumbent remains a single robust fixed rule program/executor, and the next performance work should target **online state adaptation / uncertainty-aware sequential control or broader benchmark regimes**, not another static selector.
+```text
+incumbent:            0.809
+reliability weighted: 0.810
+contingent backup:    0.825
+```
 
-### Cross-tape gap becomes materially positive and choices stabilize
+Backup has a useful point estimate but its CI still crosses zero. It is a candidate execution component, not a proven replacement.
 
-There is genuine structural specialization hidden by the quick sample. Only then is a richer observable or later-state gating architecture justified.
+### Rolling horizon
 
-### Same-tape/expected oracle remains large but cross-tape stays weak
+400-scenario V2 screen:
 
-Treat the gap as stochastic hindsight. Do not tune selector model families against it.
+```text
+one-step:    0.808
+rolling V2:  0.801
+delta:      -0.0065 CI=[-0.0325,+0.01825]
+```
 
-## Evidence ledger
+Rolling horizon is currently not justified as the primary executor and costs materially more runtime. Keep it available only for a new, specific hypothesis.
 
-Consumed/inspected blocks include:
+## Evidence hardening: where is the headroom?
 
-- `2000–2099`: structured development-test
-- `2100–2499`: V1 formal holdout
-- `3000–3399`: Axplorer V2 development
-- `4000–4399`: hybrid-executor development
-- `5000–5399`: hybrid-objective development
-- `9000–9399`: optimizer-native V1 development
-- `11000–11399`: optimizer-native V2 development
-- `13000–13399`: rolling-horizon V1 development
-- `15000–15399`: rolling-horizon V2 development
-- `17000–17399`: evidence-hardening/headroom development
-- `19000–19399`: reliability-aware executor development
-- `21000–21003`, `22000–22019`: stochastic-robust V1 quick
-- `24000–24003`, `25000–25019`: stochastic-training V2 quick
-- `27000–27399`, `28000–28399`: observable selector V1 full development
-- `30000–30019`: oracle-decomposition quick structural worlds
+400 development scenarios found:
 
-Reserved blocks tied to abandoned/unfrozen protocols must not be repurposed, including `18000–18399`, `20000–20399`, `23000–23399`, `26000–26399`, and `29000–29399`. `31000–31399` is reserved independent oracle-decomposition replication and remains untouched.
+```text
+normal incumbent:            0.801
+perfect sensing:             0.801
+deterministic interactions:  0.999
+interaction headroom:       +0.1980 CI=[+0.166,+0.23625]
+```
 
-## Claims policy
+This indicates that the largest identified simulator headroom is stochastic interaction reliability rather than simply missing sensing. Realized failures, resource depletion, overload, damage and penetrations become observable during an episode. That makes online adaptation a legitimate hypothesis.
 
-Supported development-level conclusions:
+## Oracle decomposition: episode-level program selection is closed
 
-- optimizer-aware 60-token rule search remains the strategic incumbent;
-- perfect-sensing headroom was essentially zero on `17000–17399`;
-- deterministic valid interactions showed large diagnostic headroom (`+19.8 pp`);
-- reliability weighting did not help, backup was only weakly positive, rolling horizon did not help, and repeated-tape training failed its clean quick gate;
-- the t=0 observable ridge selector underperformed the training-selected fixed strategy on full development;
-- the raw best-of-five oracle is a hindsight diagnostic and the quick cross-tape decomposition provides no evidence yet that its gap is stable across stochastic outcomes.
+Five candidate programs across 400 stochastic worlds and 8 indexed tapes/world:
+
+```text
+program means:               [0.7522,0.8370,0.8192,0.8131,0.8214]
+single-tape oracle - fixed:  +0.1037 CI=[+0.0825,+0.12625]
+expected oracle - fixed:     +0.0495 CI=[+0.04219,+0.05688]
+cross-tape oracle - fixed:   -0.0150 CI=[-0.02438,-0.00531]
+choice agreement:             0.305
+```
+
+The raw best-of-five oracle is hindsight-driven. The best frozen program on one stochastic tape often does not remain best on another tape from the same structural world. Do not claim oracle performance is attainable.
+
+The naive observable strategy selector also failed:
+
+```text
+fixed best: 0.828
+selector:   0.811
+oracle:     0.934
+```
+
+Therefore episode-level frozen-program selection is closed. This does **not** close online tactical adaptation.
+
+## PPO V1
+
+PPO was introduced as a hierarchical **online tactical controller**, not as a replacement for the structured program or constrained assignment optimizer.
+
+Hierarchy:
+
+```text
+frozen strategic program
+        |
+        v
+PPO chooses tactical mode
+        |
+        v
+constrained assignment executor
+```
+
+Six tactical modes:
+
+```text
+0 incumbent
+1 urgency
+2 conserve
+3 reliability
+4 backup
+5 failure_recovery
+```
+
+PPO does not directly choose defender-threat assignments.
+
+Observations use detected/current state and realized history only. Hidden undetected state, future outcomes, scenario seed and oracle information are forbidden.
+
+Reward remains the established project score increment:
+
+```text
+r_t = (established_score_t - established_score_{t-1}) / 10
+```
+
+### PPO quick
+
+Two independent models, seeds `42101/42102`, 100k steps/model:
+
+```text
+incumbent:    0.800
+static best:  0.800
+PPO:          0.800
+```
+
+The models nevertheless learned different tactical mixtures, so the tie did not imply behavioral collapse.
+
+### Frozen PPO generalization — COMPLETE
+
+Exact saved models evaluated on 100 additional untouched development scenarios:
+
+```text
+survival incumbent/static/PPO:  0.820 / 0.855 / 0.840
+reward incumbent/static/PPO:    157.255 / 161.168 / 159.510
+```
+
+PPO versus incumbent:
+
+```text
+survival: +0.0200 CI=[-0.01,+0.06]
+reward:   +2.255  CI=[-1.329,+6.929]
+```
+
+PPO versus static backup:
+
+```text
+survival: -0.0150 CI=[-0.055,+0.02]
+reward:   -1.658 CI=[-6.267,+2.236]
+```
+
+Per PPO seed versus incumbent:
+
+```text
+survival: [+0.01,+0.03]
+reward:   [+0.991,+3.518]
+```
+
+Correct interpretation:
+
+> PPO V1 has a positive but statistically inconclusive generalization signal over the incumbent on both survival and established reward. It has not beaten the strongest static backup strategy.
+
+Secondary metrics:
+
+```text
+                    incumbent     PPO       static backup
+containment          0.6514       0.6529    0.6502
+damage               1.5610       1.4909    1.4044
+penetrations         2.280        2.205     2.090
+overload steps       55.24        53.72     54.34
+resource exhaustion  0.45         0.51      0.51
+```
+
+PPO appears to change failure management rather than simply improving interaction reliability. It also consumes resources more aggressively than the incumbent.
+
+## Next hypothesis: PPO V2
+
+Do **not** simply spend a large PPO V1 training budget.
+
+The next hypothesis is **resource/reliability-aware hierarchical PPO V2**. Keep the base structured program and constrained assignment layer frozen for the first test, but expose richer observable information:
+
+```text
+current resource availability
+resource exhaustion risk
+recent interaction failures/successes
+overload state/history
+threat pressure
+available defender capacity
+estimated time-to-impact
+current tactical mode
+```
+
+The hypothesis is that PPO V1 lacks enough explicit resource/reliability state to make good tactical decisions.
+
+Compare:
+
+```text
+same frozen strategic program
+        |
+        +-- incumbent executor
+        +-- strongest static executor
+        +-- PPO V2 adaptive executor
+```
+
+Keep the established reward. Do not invent an objective merely to make PPO win.
+
+If PPO V2 produces a consistent, operationally meaningful improvement over both incumbent and static backup, keep RL as an architectural component and define a fresh longer-training protocol. If it ties or loses, change the learning abstraction or close this six-mode PPO hypothesis; do not merely increase timesteps.
+
+## Evidence boundaries
+
+PPO blocks:
+
+```text
+32000–32999  training / calibration
+33000–33019  PPO V1 quick — inspected
+33020–33119  frozen PPO generalization — inspected
+33120–33399  remaining PPO development
+34000–34399  reserved confirmation — DO NOT INSPECT
+```
+
+The broader project also has reserved confirmation blocks documented in `docs/AEGISSWARM_SKILL.md`. Never tune on confirmation data.
+
+## Claim discipline
+
+Supported:
+
+- structured rule search is the current incumbent;
+- stochastic interaction failure is the dominant identified simulator headroom;
+- episode-level frozen-program selection does not generalize across stochastic tapes;
+- rolling horizon, reliability variants, selectors and Axplorer have not yet robustly replaced the incumbent;
+- PPO V1 shows a positive but statistically inconclusive signal over the incumbent;
+- static backup remains stronger than PPO V1 on the current 100-scenario extension.
 
 Not supported:
 
-- raw oracle performance as deployable or predictably attainable;
-- richer selector superiority;
-- stable structural specialization before the full oracle-decomposition diagnostic;
-- deterministic interaction success as attainable;
-- superiority to optimization or RL generally;
-- real-world effectiveness or deployment readiness.
+- 'AegisSwarm beats RL.'
+- 'AegisSwarm beats optimization.'
+- 'AegisSwarm beats evolutionary search.'
+- 'AegisSwarm beats heuristics.'
+- 'PPO does not work.'
+- treating oracle performance as attainable;
+- treating deterministic interaction diagnostics as attainable;
+- real-world effectiveness/deployment claims from this simulator.
+
+## Agent runbook
+
+When asked what to do next:
+
+1. Read this file and `docs/AEGISSWARM_SKILL.md`.
+2. Inspect the active branch/protocol and recent experiment documents.
+3. Identify the current incumbent and the current open hypothesis.
+4. Do not assume architecture freeze.
+5. Prefer controlled ablations over indiscriminate extra training.
+6. Protect reserved confirmation seeds.
+7. Compare against the incumbent and strongest relevant alternative.
+8. Report point estimates, CIs, per-run effects and runtime/resource costs.
+9. Explicitly close failed hypotheses so they are not repeated.
+10. Update this status after material experiments.
+
+For every new experiment record: hypothesis, frozen components, changed components, train/eval/confirmation seeds, primary metric, reward definition, statistical test, runtime/resource cost, and decision gate.
+
+The goal is not the largest development number. The goal is a reproducible architecture whose improvements survive controlled stochastic evaluation.
