@@ -17,17 +17,37 @@ from .strategy_v2 import (
 )
 
 
-def hill_climb_v2(genes, config: EvalConfigV2, trials: int = 8, seed: int | None = None):
+class EvaluationCache:
+    """Memoize deterministic genome evaluations for one fixed EvalConfigV2."""
+
+    def __init__(self, config: EvalConfigV2):
+        self.config = config
+        self.data: dict[tuple[int, ...], dict] = {}
+        self.calls = 0
+        self.hits = 0
+
+    def evaluate(self, genes):
+        key = tuple(int(x) for x in genes)
+        if key in self.data:
+            self.hits += 1
+            return self.data[key]
+        self.calls += 1
+        metrics = evaluate_genome_v2(genes, self.config)
+        self.data[key] = metrics
+        return metrics
+
+
+def hill_climb_v2(genes, evaluator, trials: int = 8, seed: int | None = None):
     base = np.asarray(genes, dtype=np.int16).copy()
     if seed is None:
         seed = int(sum((i + 1) * int(v) for i, v in enumerate(base)) + 29)
     rng = np.random.default_rng(seed)
     best = base
-    best_metrics = evaluate_genome_v2(best, config)
+    best_metrics = evaluator.evaluate(best)
 
     for _ in range(int(trials)):
         candidate = mutate_genome_v2(best, rng, n_mutations=1, radius=3)
-        metrics = evaluate_genome_v2(candidate, config)
+        metrics = evaluator.evaluate(candidate)
         if metrics["fitness"] > best_metrics["fitness"]:
             best = candidate
             best_metrics = metrics
@@ -35,8 +55,8 @@ def hill_climb_v2(genes, config: EvalConfigV2, trials: int = 8, seed: int | None
     return best, best_metrics
 
 
-def _rank(genomes, config: EvalConfigV2):
-    scored = [(evaluate_genome_v2(g, config), g) for g in genomes]
+def _rank(genomes, evaluator):
+    scored = [(evaluator.evaluate(g), g) for g in genomes]
     scored.sort(key=lambda x: x[0]["fitness"], reverse=True)
     return scored
 
@@ -73,13 +93,17 @@ def train_policy_search_v2(
     population_data = [random_genome_v2(rng) for _ in range(population)]
     history = []
 
+    screen_eval = EvaluationCache(screen_config)
+    train_eval = EvaluationCache(train_config)
+    validation_eval = EvaluationCache(validation_config)
+
     for epoch in range(int(epochs)):
-        screen_ranked = _rank(population_data, screen_config)
+        screen_ranked = _rank(population_data, screen_eval)
         elite_n = max(8, int(population * elite_fraction))
         promote_n = max(elite_n, int(population * promotion_fraction))
         promoted = [g.copy() for _, g in screen_ranked[:promote_n]]
 
-        train_ranked = _rank(promoted, train_config)
+        train_ranked = _rank(promoted, train_eval)
         elites = [g.copy() for _, g in train_ranked[:elite_n]]
 
         train_model(
@@ -104,7 +128,7 @@ def train_policy_search_v2(
         for i, genome in enumerate(sampled):
             candidate, _ = hill_climb_v2(
                 genome,
-                screen_config,
+                screen_eval,
                 trials=local_search_trials,
                 seed=seed + epoch * 100_000 + i,
             )
@@ -113,15 +137,15 @@ def train_policy_search_v2(
         archive_genomes = [np.asarray(e["genes"], dtype=np.int16) for e in archive.ranked()]
         candidates = unique_genomes(elites + sampled + improved + archive_genomes)
 
-        candidate_screen = _rank(candidates, screen_config)
+        candidate_screen = _rank(candidates, screen_eval)
         candidate_promote_n = max(elite_n, int(len(candidate_screen) * promotion_fraction))
         candidate_promote_n = min(max(candidate_promote_n, population // 2), len(candidate_screen))
         train_candidates = [g for _, g in candidate_screen[:candidate_promote_n]]
-        candidate_train = _rank(train_candidates, train_config)
+        candidate_train = _rank(train_candidates, train_eval)
 
         val_n = min(max(1, int(validation_candidates)), len(candidate_train))
         for train_metrics, genome in candidate_train[:val_n]:
-            validation_metrics = evaluate_genome_v2(genome, validation_config)
+            validation_metrics = validation_eval.evaluate(genome)
             archive.add(
                 genome,
                 train_metrics=train_metrics,
@@ -161,6 +185,14 @@ def train_policy_search_v2(
             "validation_fitness": champion["validation"]["fitness"],
             "validation_asset_survival_rate": champion["validation"]["asset_survival_rate"],
             "validation_containment_rate": champion["validation"]["containment_rate"],
+            "cache": {
+                "screen_unique": screen_eval.calls,
+                "screen_hits": screen_eval.hits,
+                "train_unique": train_eval.calls,
+                "train_hits": train_eval.hits,
+                "validation_unique": validation_eval.calls,
+                "validation_hits": validation_eval.hits,
+            },
         })
 
     return archive.best, history, model, archive
